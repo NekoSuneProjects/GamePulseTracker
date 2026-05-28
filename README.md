@@ -87,7 +87,7 @@ npm run dev
 | `wynncraft`   | Wynncraft              | Public Wynncraft v3 API                                          |
 | `warframe`    | Warframe               | warframestat.us world state + **warframe.market trade analytics** |
 | `roblox`      | Roblox                 | users.roblox.com public profile                                  |
-| `beat-saber`  | Beat Saber             | ScoreSaber (PP, accuracy, ranked count, country rank)            |
+| `beat-saber`  | Beat Saber             | Aggregates **ScoreSaber + BeatLeader + AccSaber + HitBloq** in parallel. Surfaces BeatLeader mod-usage (NoodleExtensions, Chroma, MappingExtensions) and HitBloq per-pool ranks. |
 | `vrchat-worlds` | VRChat Worlds        | api.vrchat.cloud worlds endpoints (PII-free, requires user's own auth cookie) |
 
 ### Live integrations (free API key required)
