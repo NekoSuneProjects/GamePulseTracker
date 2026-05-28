@@ -3,13 +3,23 @@
 import { io, Socket } from 'socket.io-client';
 import { useEffect, useRef } from 'react';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:4000';
+/**
+ * Resolve the Socket.IO endpoint at runtime. Falls back to same-origin (nginx
+ * proxies /socket.io/* to backend) when no explicit env var is provided, so a
+ * blank NEXT_PUBLIC_WS_URL Just Works behind nginx.
+ */
+function resolveWsUrl(): string {
+  const baked = process.env.NEXT_PUBLIC_WS_URL?.trim();
+  if (baked) return baked.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:4000';
+}
 
 let singleton: Socket | null = null;
 
 export function getSocket(): Socket {
   if (singleton) return singleton;
-  singleton = io(WS_URL, { transports: ['websocket'], autoConnect: true, reconnection: true });
+  singleton = io(resolveWsUrl(), { transports: ['websocket'], autoConnect: true, reconnection: true });
   return singleton;
 }
 
