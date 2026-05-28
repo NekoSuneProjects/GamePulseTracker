@@ -7,27 +7,30 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
       interval: 10s
       timeout: 5s
       retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: gpt-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    command:
+      - redis-server
+      - --appendonly
+      - yes
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - ping
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,6 +39,7 @@ services:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
+    image: ghcr.io/nekosuneprojects/gamepulsetracker-backend:main
     container_name: gpt-backend
     restart: unless-stopped
     depends_on:
@@ -68,6 +72,7 @@ services:
         NEXT_PUBLIC_ADSENSE_SLOT_FOOTER: ${NEXT_PUBLIC_ADSENSE_SLOT_FOOTER:-}
         NEXT_PUBLIC_ADBLOCK_NOTICE: ${NEXT_PUBLIC_ADBLOCK_NOTICE:-true}
         NEXT_PUBLIC_OVERWOLF_DOWNLOAD_URL: ${NEXT_PUBLIC_OVERWOLF_DOWNLOAD_URL:-}
+    image: ghcr.io/nekosuneprojects/gamepulsetracker-frontend:main
     container_name: gpt-frontend
     restart: unless-stopped
     depends_on:
