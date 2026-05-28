@@ -1,20 +1,14 @@
 import { GAME_CATALOG } from '@gpt/shared';
 import { GameTile } from '@/components/GameTile';
 import { SearchBar } from '@/components/SearchBar';
+import { serverFetch } from '@/lib/api-server';
 
-async function getCatalog() {
-  const url = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/games`;
-  try {
-    const res = await fetch(url, { cache: 'no-store' });
-    const j = await res.json();
-    return (j?.data ?? []) as Array<{ slug: string; name: string; enabled: boolean; live: boolean }>;
-  } catch {
-    return GAME_CATALOG.map(g => ({ slug: g.slug, name: g.name, enabled: false, live: g.live }));
-  }
-}
+type CatalogRow = { slug: string; name: string; enabled: boolean; live: boolean };
 
 export default async function GamesPage() {
-  const games = await getCatalog();
+  const games =
+    (await serverFetch<CatalogRow[]>('/games')) ??
+    GAME_CATALOG.map(g => ({ slug: g.slug, name: g.name, enabled: false, live: g.live }));
   return (
     <div className="space-y-8">
       <header>

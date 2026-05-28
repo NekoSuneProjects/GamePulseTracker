@@ -1,33 +1,21 @@
 import Link from 'next/link';
 import { SearchBar } from '@/components/SearchBar';
 import { NewsList } from '@/components/NewsList';
+import { serverFetch } from '@/lib/api-server';
 import type { GameSlug, NewsItem } from '@gpt/shared';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface RecentRow {
   id: string; game: string; platform: string; providerId: string;
   displayName: string; avatarUrl?: string; lastFetchedAt: string | null;
 }
 
-async function fetchRecent(game: string): Promise<RecentRow[]> {
-  try {
-    const r = await fetch(`${API}/stats/recent?limit=24`, { cache: 'no-store' });
-    const j = await r.json();
-    return ((j?.data ?? []) as RecentRow[]).filter(r => r.game === game);
-  } catch { return []; }
-}
-
-async function fetchNews(game: string): Promise<NewsItem[]> {
-  try {
-    const r = await fetch(`${API}/news/${game}?limit=9`, { cache: 'no-store' });
-    const j = await r.json();
-    return (j?.data ?? []) as NewsItem[];
-  } catch { return []; }
-}
-
 export default async function GamePage({ params }: { params: { game: string } }) {
-  const [recent, news] = await Promise.all([fetchRecent(params.game), fetchNews(params.game)]);
+  const [recentAll, newsRaw] = await Promise.all([
+    serverFetch<RecentRow[]>(`/stats/recent?limit=24`),
+    serverFetch<NewsItem[]>(`/news/${encodeURIComponent(params.game)}?limit=9`),
+  ]);
+  const recent = (recentAll ?? []).filter(r => r.game === params.game);
+  const news = newsRaw ?? [];
 
   return (
     <div className="space-y-10">

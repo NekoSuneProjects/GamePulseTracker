@@ -96,6 +96,12 @@ services:
       PORT: 3000
       FRONTEND_PORT: 3000
       HOSTNAME: 0.0.0.0
+      # Server-only API URL for SSR / RSC fetches. NEXT_PUBLIC_API_URL=/api is
+      # great for the browser (relative path → nginx → backend) but breaks
+      # Node's fetch during SSR (it can't resolve relative URLs). The frontend
+      # container reaches the backend directly inside the compose network,
+      # which doesn't go through nginx, so no /api prefix here.
+      INTERNAL_API_URL: http://backend:4000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { SocialLink } from '@gpt/shared';
+import { serverFetch } from '@/lib/api-server';
 
 interface PublicProfile {
   id: string;
@@ -13,23 +14,13 @@ interface PublicProfile {
   trackedProfiles: Array<{ id: string; game: string; platform: string; providerId: string; displayName: string; avatarUrl: string | null; lastFetchedAt: string | null }>;
 }
 
-async function getProfile(username: string): Promise<PublicProfile | null> {
-  const url = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/users/${encodeURIComponent(username)}`;
-  try {
-    const r = await fetch(url, { cache: 'no-store' });
-    if (r.status === 404) return null;
-    const j = await r.json();
-    return j.ok ? (j.data as PublicProfile) : null;
-  } catch { return null; }
-}
-
 const SOCIAL_ICON: Record<string, string> = {
   twitter: '𝕏', twitch: '🟣', youtube: '▶', discord: '🟦',
   tiktok: '🎵', kick: '🦵', instagram: '📷', github: '🐙', website: '🌐',
 };
 
 export default async function UserProfilePage({ params }: { params: { username: string } }) {
-  const profile = await getProfile(params.username);
+  const profile = await serverFetch<PublicProfile>(`/users/${encodeURIComponent(params.username)}`);
   if (!profile) notFound();
 
   return (

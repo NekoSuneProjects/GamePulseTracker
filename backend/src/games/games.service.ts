@@ -38,62 +38,83 @@ export class GamesService {
    */
   async getProfile(game: string, identifier: string, opts: { platform?: string; forceRefresh?: boolean } = {}) {
     const integ = this.integrations.get(game);
-    const platform = normalisePlatform(opts.platform);
+    const inputPlatform = normalisePlatform(opts.platform);
 
-    const cached5min = await this.redis.getJson<unknown>(this.redisKey(game, platform, identifier));
-    if (cached5min && !opts.forceRefresh) {
-      return cached5min as { profile: unknown; snapshot: unknown; fresh: false };
-    }
-
-    const existing = await this.prisma.trackedProfile.findUnique({
-      where: { game_platform_providerId: { game, platform, providerId: identifier } },
+    // 1. Try the row keyed exactly as the user requested.
+    let existing = await this.prisma.trackedProfile.findUnique({
+      where: { game_platform_providerId: { game, platform: inputPlatform, providerId: identifier } },
     });
 
-    if (!existing || opts.forceRefresh || !existing.lastFetchedAt) {
-      // First-time or forced refresh: resolve identity if available, then fetch.
-      let resolved: { providerId: string; displayName: string; platform?: string } = {
-        providerId: identifier, displayName: identifier, platform,
-      };
-      if (integ.resolveIdentity) {
-        try {
-          resolved = await integ.resolveIdentity({ identifier, platform: opts.platform });
-        } catch { /* keep identifier as-is */ }
-      }
-      const snap = await integ.getProfile({ identifier: resolved.providerId, platform: opts.platform });
+    // 2. If not found, resolve identity (might canonicalize username → uuid,
+    //    `_` → 'minecraft', etc.) and check the row again under canonical key.
+    let resolvedProviderId = identifier;
+    let resolvedPlatform   = inputPlatform;
+    let resolvedDisplay    = identifier;
+    if (!existing && integ.resolveIdentity) {
+      try {
+        const r = await integ.resolveIdentity({ identifier, platform: opts.platform });
+        resolvedProviderId = r.providerId;
+        resolvedPlatform   = normalisePlatform(r.platform);
+        resolvedDisplay    = r.displayName ?? identifier;
+        if (resolvedPlatform !== inputPlatform || resolvedProviderId !== identifier) {
+          existing = await this.prisma.trackedProfile.findUnique({
+            where: { game_platform_providerId: { game, platform: resolvedPlatform, providerId: resolvedProviderId } },
+          });
+        }
+      } catch { /* fall through with input values */ }
+    }
 
-      const upserted = await this.prisma.trackedProfile.upsert({
-        where: { game_platform_providerId: { game, platform, providerId: resolved.providerId } },
-        update: {
-          displayName: snap.displayName,
-          platform: snap.platform ?? platform,
-          avatarUrl: snap.avatarUrl,
-          latestSnapshot: snap as unknown as object,
-          providerUpdatedAt: snap.providerUpdatedAt ? new Date(snap.providerUpdatedAt) : null,
-          lastFetchedAt: new Date(),
-          lastAttemptedAt: new Date(),
-        },
-        create: {
-          game,
-          platform: snap.platform ?? platform,
-          providerId: resolved.providerId,
-          displayName: snap.displayName,
-          avatarUrl: snap.avatarUrl,
-          latestSnapshot: snap as unknown as object,
-          providerUpdatedAt: snap.providerUpdatedAt ? new Date(snap.providerUpdatedAt) : null,
-          lastFetchedAt: new Date(),
-          lastAttemptedAt: new Date(),
-        },
-      });
+    const canonicalKey = { game, platform: resolvedPlatform, providerId: resolvedProviderId };
+    const cacheKey = this.redisKey(canonicalKey.game, canonicalKey.platform, canonicalKey.providerId);
 
-      await this.recordSnapshot(upserted.id, snap as unknown as Record<string, unknown>);
+    // 3. Cache hit? Use it.
+    if (!opts.forceRefresh) {
+      const cached = await this.redis.getJson<unknown>(cacheKey);
+      if (cached) return cached as { profile: unknown; snapshot: unknown; fresh: false };
+    }
 
-      const result = { profile: upserted, snapshot: snap, fresh: true };
-      await this.redis.setJson(this.redisKey(game, platform, resolved.providerId), result, 300);
+    // 4. Already in DB and not forcing a refresh? Use the row, no fetch.
+    if (existing && !opts.forceRefresh && existing.lastFetchedAt) {
+      const result = { profile: existing, snapshot: existing.latestSnapshot, fresh: false };
+      await this.redis.setJson(cacheKey, result, 300);
       return result;
     }
 
-    const result = { profile: existing, snapshot: existing.latestSnapshot, fresh: false };
-    await this.redis.setJson(this.redisKey(game, platform, identifier), result, 300);
+    // 5. Otherwise fetch fresh from the integration and upsert.
+    const snap = await integ.getProfile({ identifier: resolvedProviderId, platform: opts.platform });
+    // Some integrations report a more specific platform in the snapshot than
+    // the resolver did. Use that as the final, canonical platform for storage.
+    const finalPlatform = snap.platform ? normalisePlatform(snap.platform) : canonicalKey.platform;
+
+    const upserted = await this.prisma.trackedProfile.upsert({
+      where: { game_platform_providerId: { game, platform: finalPlatform, providerId: resolvedProviderId } },
+      update: {
+        displayName: snap.displayName ?? resolvedDisplay,
+        platform: finalPlatform,
+        avatarUrl: snap.avatarUrl,
+        latestSnapshot: snap as unknown as object,
+        providerUpdatedAt: snap.providerUpdatedAt ? new Date(snap.providerUpdatedAt) : null,
+        lastFetchedAt: new Date(),
+        lastAttemptedAt: new Date(),
+      },
+      create: {
+        game,
+        platform: finalPlatform,
+        providerId: resolvedProviderId,
+        displayName: snap.displayName ?? resolvedDisplay,
+        avatarUrl: snap.avatarUrl,
+        latestSnapshot: snap as unknown as object,
+        providerUpdatedAt: snap.providerUpdatedAt ? new Date(snap.providerUpdatedAt) : null,
+        lastFetchedAt: new Date(),
+        lastAttemptedAt: new Date(),
+      },
+    });
+
+    await this.recordSnapshot(upserted.id, snap as unknown as Record<string, unknown>);
+
+    const finalCacheKey = this.redisKey(game, finalPlatform, resolvedProviderId);
+    const result = { profile: upserted, snapshot: snap, fresh: true };
+    await this.redis.setJson(finalCacheKey, result, 300);
     return result;
   }
 
