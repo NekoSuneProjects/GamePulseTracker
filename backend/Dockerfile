@@ -23,7 +23,11 @@ RUN set -ex \
  && npm run build --workspace shared \
  && cd backend \
  && npx prisma generate \
- && npm run build
+ && npm run build \
+ && mkdir -p /app/backend/node_modules
+# ^ npm hoists differently between incremental and clean installs. The runner
+# stage COPYs backend/node_modules unconditionally; ensure it exists (even
+# empty) so the build doesn't error when every dep ended up hoisted to root.
 
 # ---- Runner ----
 FROM node:20-bookworm-slim AS runner
