@@ -45,6 +45,10 @@ COPY --from=builder /app/backend/package.json ./backend/
 COPY --from=builder /app/backend/dist         ./backend/dist/
 COPY --from=builder /app/backend/prisma       ./backend/prisma/
 COPY --from=builder /app/node_modules         ./node_modules/
+# Some deps (otplib v12, @otplib/core) refuse to hoist to the root node_modules
+# because they conflict with versions npm pinned for other consumers. They end
+# up at backend/node_modules instead. Without this COPY they're missing at runtime.
+COPY --from=builder /app/backend/node_modules ./backend/node_modules/
 
 WORKDIR /app/backend
 EXPOSE 4000
