@@ -1,6 +1,24 @@
 import type { ApiResponse } from '@gpt/shared';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+/**
+ * Resolve the API base URL at runtime.
+ *
+ * Priority:
+ *   1. NEXT_PUBLIC_API_URL baked into the build (set in docker-compose ARG or .env)
+ *   2. Same-origin /api  — works behind nginx (which proxies /api/* → backend)
+ *   3. http://localhost:4000 for `npm run dev`
+ *
+ * Step 2 is what stops the "POST /auth/login 404 from the frontend" case the
+ * user hit: if the deployer forgot to set NEXT_PUBLIC_API_URL, the request
+ * goes to /api/auth/login (nginx-handled) instead of /auth/login (frontend,
+ * which has no such route).
+ */
+const API_URL = (() => {
+  const baked = process.env.NEXT_PUBLIC_API_URL;
+  if (baked) return baked.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return `${window.location.origin}/api`;
+  return 'http://localhost:4000';
+})();
 
 const TOKEN_KEY = 'gpt:access';
 const REFRESH_KEY = 'gpt:refresh';
