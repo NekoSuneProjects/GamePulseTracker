@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { NormalizedProfile } from '@gpt/shared';
 import type { GameIntegration, ProfileQuery, ResolvedIdentity, SearchHit } from '../integration.interface';
-import { httpJson } from '../http.helper';
+import { httpJson, IntegrationHttpError } from '../http.helper';
+import { VrchatAuthService } from './vrchat-auth.service';
 
 /**
  * VRChat — WORLDS-ONLY integration.
@@ -10,18 +11,15 @@ import { httpJson } from '../http.helper';
  * collected via their API. We restrict ourselves to public world analytics:
  * visit count, favorites, capacity, instance count, tags.
  *
- * Two ways to call:
- *   1. Direct HTTPS to api.vrchat.cloud — REQUIRES a logged-in cookie. Put the
- *      raw cookie value (auth=authcookie_...) in VRCHAT_AUTH_COOKIE.
- *   2. (If you want a typed client) install the `vrchat` npm package
- *      (https://www.npmjs.com/package/vrchat). The package wraps the same
- *      endpoints. If installed it will be picked up here automatically.
+ * Auth: we DON'T require a manually-extracted browser cookie. Instead we
+ * accept the user's VRChat credentials in env (VRCHAT_USERNAME +
+ * VRCHAT_PASSWORD, plus VRCHAT_TOTP_SECRET if the account has TOTP 2FA
+ * enabled). The VrchatAuthService logs in, handles 2FA, caches the resulting
+ * session cookie in Redis, and refreshes it transparently on 401.
  *
- * Endpoints used (worlds-only, public-ish — still requires a cookie):
- *   GET  https://api.vrchat.cloud/api/1/worlds/<worldId>
- *   GET  https://api.vrchat.cloud/api/1/worlds?search=<q>&n=20
- *
- * `providerId` is the world id (`wrld_xxxxxxxx...`).
+ * Endpoints used:
+ *   GET https://api.vrchat.cloud/api/1/worlds/<worldId>
+ *   GET https://api.vrchat.cloud/api/1/worlds?search=<q>&n=12
  */
 
 interface VrcWorld {
@@ -53,7 +51,10 @@ export class VrchatWorldsIntegration implements GameIntegration {
   readonly name = 'VRChat Worlds';
   readonly live = true;
   readonly platforms = ['vrchat'] as const;
-  isEnabled() { return Boolean(process.env.VRCHAT_AUTH_COOKIE); }
+
+  constructor(private auth: VrchatAuthService) {}
+
+  isEnabled(): boolean { return this.auth.isConfigured(); }
 
   async search(q: { query: string }): Promise<SearchHit[]> {
     if (!this.isEnabled() || !q.query.trim()) return [];
@@ -73,7 +74,7 @@ export class VrchatWorldsIntegration implements GameIntegration {
   }
 
   async getProfile(q: ProfileQuery): Promise<NormalizedProfile> {
-    if (!this.isEnabled()) throw new Error('VRCHAT_AUTH_COOKIE is not set');
+    if (!this.isEnabled()) throw new Error('VRChat credentials not configured');
     if (!q.identifier.startsWith('wrld_')) {
       throw new Error('VRChat providerId must be a world id (wrld_xxx). Use search first.');
     }
@@ -86,9 +87,9 @@ export class VrchatWorldsIntegration implements GameIntegration {
       platform: 'vrchat',
       avatarUrl: w.thumbnailImageUrl ?? w.imageUrl,
       headline: {
-        wins:    w.favorites,
-        matches: w.visits,
-        rank:    w.releaseStatus,
+        wins:     w.favorites,
+        matches:  w.visits,
+        rank:     w.releaseStatus,
         rankTier: w.popularity,
       },
       details: {
@@ -114,19 +115,22 @@ export class VrchatWorldsIntegration implements GameIntegration {
   }
 
   /**
-   * Note: we go direct to api.vrchat.cloud rather than depending on the `vrchat`
-   * npm package at build time so the integration works whether or not the
-   * optional dep is installed. If/when you want the typed client, install
-   * `npm i vrchat` and re-implement these calls with it.
+   * Fetch with auth cookie. On 401 we invalidate the cached cookie, re-login,
+   * and retry once. Any other error bubbles up.
    */
-  private req<T>(path: string, query: Record<string, string> = {}): Promise<T> {
-    const cookie = process.env.VRCHAT_AUTH_COOKIE!;
-    return httpJson<T>(`https://api.vrchat.cloud${path}`, {
-      query,
-      headers: {
-        Cookie: cookie.startsWith('auth=') ? cookie : `auth=${cookie}`,
-        'User-Agent': 'GamePulseTracker/0.1 (worlds-only)',
-      },
-    });
+  private async req<T>(path: string, query: Record<string, string> = {}, retried = false): Promise<T> {
+    const cookie = await this.auth.getCookieHeader();
+    try {
+      return await httpJson<T>(`https://api.vrchat.cloud${path}`, {
+        query,
+        headers: { Cookie: cookie, 'User-Agent': this.auth.userAgent() },
+      });
+    } catch (e) {
+      if (e instanceof IntegrationHttpError && e.status === 401 && !retried) {
+        await this.auth.invalidate();
+        return this.req(path, query, true);
+      }
+      throw e;
+    }
   }
 }

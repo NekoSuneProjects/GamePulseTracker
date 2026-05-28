@@ -34,6 +34,7 @@ import { LolIntegration }           from './lol/lol.integration';
 import { TftIntegration }           from './tft/tft.integration';
 import { ArcRaidersIntegration }    from './arc-raiders/arc-raiders.integration';
 import { VrchatWorldsIntegration }  from './vrchat-worlds/vrchat-worlds.integration';
+import { VrchatAuthService }        from './vrchat-worlds/vrchat-auth.service';
 
 // Battlefield titles (share base)
 import { Battlefield3Integration }        from './battlefield/battlefield-3.integration';
@@ -70,8 +71,8 @@ const integrations = [
 
 @Global()
 @Module({
-  providers: [IntegrationRegistry, ...integrations],
-  exports:   [IntegrationRegistry, ...integrations],
+  providers: [IntegrationRegistry, VrchatAuthService, ...integrations],
+  exports:   [IntegrationRegistry, VrchatAuthService, ...integrations],
 })
 export class IntegrationsModule implements OnModuleInit {
   constructor(

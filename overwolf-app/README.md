@@ -11,11 +11,29 @@ It's intentionally small. The interesting code lives in
 
 ## Install for development
 
+> If you double-click the `.opk` (or `manifest.json`) and Overwolf says
+> **"Unauthorized App — You're trying to install an app from an unauthorized
+> source. To download new apps, please visit the official Overwolf Appstore."**
+> that's normal. Overwolf blocks direct install of unsigned packages by
+> design. Use the **Load unpacked extension** path below instead.
+
 1. Install [Overwolf](https://www.overwolf.com/) on Windows.
-2. Open Overwolf settings → **About** → **Development Options** → **Load unpacked extension** → pick this `overwolf-app/` folder.
-3. Open the GamePulseTracker companion from your Overwolf dock.
-4. Paste your server URL and a device key issued at `/devices` on the web app.
-5. Toggle which games you want to forward, then launch one.
+2. Open Overwolf and sign in.
+3. **Enable Developer Mode**: click the gear icon → **About** → tap the
+   **version number 5 times** until you see *"Development options enabled"*.
+   (Or: open https://www.overwolf.com/welcome/developers and follow the
+   in-app prompt.) Once on, a new **Developer options** entry appears in the
+   settings tray icon menu.
+4. Open the Developer options window → click **Load unpacked extension**
+   → browse to the `overwolf-app/` folder (the one with `manifest.json` in
+   it) → **Select Folder**.
+5. The companion now shows up in your Overwolf dock. Click to launch it.
+6. Paste your server URL and a device key issued at `/devices` on the web app.
+7. Toggle which games you want to forward, then launch one.
+
+If Overwolf still rejects the manifest, double-check that
+`overwolf-app/icons/icon-256.png`, `icon-256-gray.png`, and `icon-256.ico`
+all exist — the manifest references them and Overwolf validates the paths.
 
 ## Build a distributable `.opk`
 
