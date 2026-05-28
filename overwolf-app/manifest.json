@@ -5,7 +5,7 @@
     "name": "GamePulseTracker Companion",
     "author": "NekoSuneProjects",
     "version": "0.1.0",
-    "minimum-overwolf-version": "0.241.0",
+    "minimum-overwolf-version": "0.236.0",
     "description": "Posts in-game stats to your self-hosted GamePulseTracker server. Works for games where the official APIs are not available (CoD, Warframe, Arc Raiders, Marvel Rivals, etc.)",
     "icon": "icons/icon-256.png",
     "icon_gray": "icons/icon-256-gray.png",

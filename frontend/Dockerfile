@@ -23,25 +23,17 @@ ENV NEXT_PUBLIC_ADSENSE_SLOT_FOOTER=$NEXT_PUBLIC_ADSENSE_SLOT_FOOTER
 ENV NEXT_PUBLIC_ADBLOCK_NOTICE=$NEXT_PUBLIC_ADBLOCK_NOTICE
 ENV NEXT_PUBLIC_OVERWOLF_DOWNLOAD_URL=$NEXT_PUBLIC_OVERWOLF_DOWNLOAD_URL
 
-# Root manifest + lockfile + ALL workspace manifests (npm errors on any missing
-# workspace declared in package.json's `workspaces` field).
-COPY package.json package-lock.json ./
-COPY shared/package.json   ./shared/
-COPY shared/tsconfig.json  ./shared/
-COPY frontend/package.json ./frontend/
-COPY backend/package.json  ./backend/
+# Copy everything. .dockerignore strips node_modules/dist/.next etc.
+COPY . .
 
-RUN npm ci --no-audit --no-fund --ignore-scripts
-
-# Build shared first so its dist/ exists when Next resolves @gpt/shared.
-COPY shared/src ./shared/src/
-RUN npm run build --workspace shared
-
-# Frontend source
-COPY frontend ./frontend/
-
-WORKDIR /app/frontend
-RUN npm run build
+RUN set -ex \
+ && node --version \
+ && npm --version \
+ && ls -la \
+ && npm ci --no-audit --no-fund --ignore-scripts \
+ && npm run build --workspace shared \
+ && cd frontend \
+ && npm run build
 
 # ---- Runner ----
 FROM node:20-bookworm-slim AS runner
@@ -51,8 +43,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates tini \
  && rm -rf /var/lib/apt/lists/*
 
-# Next standalone output is self-contained: server.js + a minimal
-# node_modules + .next/static + public/.
+# Next standalone output is self-contained: server.js + minimal node_modules.
 COPY --from=builder /app/frontend/.next/standalone ./
 COPY --from=builder /app/frontend/.next/static     ./frontend/.next/static
 COPY --from=builder /app/frontend/public           ./frontend/public
