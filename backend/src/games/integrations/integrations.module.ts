@@ -12,6 +12,7 @@ import { WowsIntegration }        from './wargaming/wows.integration';
 import { WowpIntegration }        from './wargaming/wowp.integration';
 import { RobloxIntegration }      from './roblox/roblox.integration';
 import { BeatSaberIntegration }   from './beat-saber/beat-saber.integration';
+import { ClashOfClansIntegration } from './clash-of-clans/clash-of-clans.integration';
 
 // Stubs (multi-platform)
 import { FortniteIntegration }      from './fortnite/fortnite.integration';
@@ -55,7 +56,7 @@ const integrations = [
   // Live
   HypixelIntegration, WynncraftIntegration, OsrsIntegration, RunescapeIntegration,
   WarframeIntegration, WotIntegration, WowsIntegration, WowpIntegration, RobloxIntegration,
-  BeatSaberIntegration,
+  BeatSaberIntegration, ClashOfClansIntegration,
   // Stubs (single-class)
   FortniteIntegration, ApexIntegration, MarvelRivalsIntegration, HaloInfiniteIntegration,
   RocketLeagueIntegration, Cs2Integration, SplitgateIntegration, DestinyIntegration,
@@ -97,6 +98,7 @@ export class IntegrationsModule implements OnModuleInit {
     private a36: CodWarzoneIntegration, private a37: CodColdWarIntegration,
     private a38: CodMwiiIntegration,    private a39: CodMwiiiIntegration, private a40: CodBo6Integration,
     private a41: BeatSaberIntegration,
+    private a42: ClashOfClansIntegration,
   ) {}
 
   onModuleInit() {
@@ -105,7 +107,7 @@ export class IntegrationsModule implements OnModuleInit {
       this.a10, this.a11, this.a12, this.a13, this.a14, this.a15, this.a16, this.a17, this.a18,
       this.a19, this.a20, this.a21, this.a22, this.a23, this.a24, this.a25, this.a26, this.a27,
       this.a28, this.a29, this.a30, this.a31, this.a32, this.a33, this.a34, this.a35,
-      this.a36, this.a37, this.a38, this.a39, this.a40, this.a41,
+      this.a36, this.a37, this.a38, this.a39, this.a40, this.a41, this.a42,
     ];
     for (const integ of all) this.registry.register(integ);
   }

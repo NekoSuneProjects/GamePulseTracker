@@ -65,7 +65,8 @@ export class HypixelIntegration implements GameIntegration {
       providerId: p.uuid,
       displayName: p.displayname,
       platform: 'minecraft',
-      avatarUrl: `https://crafatar.com/avatars/${p.uuid}?size=128&overlay`,
+      // Full-body Minecraft skin render via Crafatar.
+      avatarUrl: `https://crafatar.com/renders/body/${p.uuid}?overlay&size=512`,
       headline: {
         level: Math.floor(networkLevel),
         xp: p.networkExp,

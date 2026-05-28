@@ -72,6 +72,9 @@ export const GAME_CATALOG = [
   { slug: 'lol', name: 'League of Legends', provider: 'Riot LoL API', live: false, platforms: ['na', 'euw', 'eune', 'kr', 'br', 'jp', 'lan', 'las', 'oce', 'tr', 'ru', 'vn'] },
   { slug: 'tft', name: 'Teamfight Tactics', provider: 'Riot TFT API', live: false, platforms: ['na', 'euw', 'eune', 'kr', 'br', 'jp', 'lan', 'las', 'oce', 'tr', 'ru', 'vn'] },
 
+  // ---- Mobile / Supercell ----
+  { slug: 'clash-of-clans', name: 'Clash of Clans',   provider: 'Supercell official', live: true,  platforms: ['player', 'clan'] },
+
   // ---- VR + rhythm ----
   { slug: 'beat-saber',     name: 'Beat Saber',       provider: 'ScoreSaber',       live: true,  platforms: ['pcvr', 'quest'] },
 

@@ -29,7 +29,25 @@ export class WynncraftIntegration implements GameIntegration {
   readonly name = 'Wynncraft';
   readonly live = true;
   readonly platforms = ['minecraft'] as const;
-  isEnabled(): boolean { return true; }
+
+  /**
+   * Wynncraft has been free to query without auth for years, but as of
+   * August 2025 they added optional token-based authentication that lifts
+   * the rate limit per token. We pass the token if WYNNCRAFT_API_KEY is set;
+   * unauthenticated calls still work but share a tighter global bucket.
+   *
+   * Public-mode tokens are recommended (Account Dashboard → "Public" flag)
+   * so we don't leak the operator's personal stats if they happen to query
+   * their own profile.
+   *
+   * Docs: https://docs.wynncraft.com/docs/authentication
+   */
+  isEnabled() { return true; }
+
+  private headers(): Record<string, string> {
+    const token = process.env.WYNNCRAFT_API_KEY?.trim();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
 
   async search(q: { query: string }): Promise<SearchHit[]> {
     const clean = q.query.trim();
@@ -50,6 +68,7 @@ export class WynncraftIntegration implements GameIntegration {
   async getProfile(q: ProfileQuery): Promise<NormalizedProfile> {
     const data = await httpJson<WynnPlayerResp>(`${WYNN_API}/player/${encodeURIComponent(q.identifier)}`, {
       query: { fullResult: 'True' },
+      headers: this.headers(),
     });
     const g = data.globalData ?? {};
     const pvpKd = this.safeRatio(g.pvp?.kills, g.pvp?.deaths);
@@ -68,7 +87,8 @@ export class WynncraftIntegration implements GameIntegration {
       providerId: data.uuid,
       displayName: data.username,
       platform: 'minecraft',
-      avatarUrl: `https://crafatar.com/avatars/${data.uuid}?size=128&overlay`,
+      // Full-body Minecraft skin render via Crafatar.
+      avatarUrl: `https://crafatar.com/renders/body/${data.uuid}?overlay&size=512`,
       headline: {
         level: totalLevel,
         rank: data.shortenedRank ?? data.rank ?? undefined,
