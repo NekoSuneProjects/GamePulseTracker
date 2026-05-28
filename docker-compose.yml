@@ -55,10 +55,14 @@ services:
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     healthcheck:
+      # start_period gives prisma migrate deploy + NestFactory.create enough
+      # time to land before Docker starts counting failed probes. Otherwise
+      # a fresh boot can flip "starting" → "unhealthy" and trip nginx 502s.
       test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 5
+      start_period: 90s
 
   frontend:
     build:
