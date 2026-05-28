@@ -52,6 +52,12 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
+      # IMPORTANT: the container ALWAYS listens on 4000 internally. BACKEND_PORT
+      # in .env is just the HOST port the docker-compose port mapping uses.
+      # Without this override, env_file would propagate BACKEND_PORT into the
+      # container and Nest would listen on the wrong port, breaking the
+      # healthcheck and nginx → backend:4000 routing.
+      BACKEND_PORT: 4000
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     healthcheck:
@@ -84,6 +90,12 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+      # Same fix as the backend: force the container's internal port so any
+      # PORT/FRONTEND_PORT in .env can't break the docker-internal :3000
+      # that nginx + the port mapping rely on.
+      PORT: 3000
+      FRONTEND_PORT: 3000
+      HOSTNAME: 0.0.0.0
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
 
