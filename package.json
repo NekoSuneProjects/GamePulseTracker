@@ -4,12 +4,14 @@
   "private": true,
   "description": "Self-hosted real-time multi-game player statistics platform.",
   "workspaces": [
+    "shared",
     "backend",
-    "frontend",
-    "shared"
+    "frontend"
   ],
   "scripts": {
-    "dev": "concurrently -k -n backend,frontend -c green,cyan \"npm:dev --workspace backend\" \"npm:dev --workspace frontend\"",
+    "shared:build": "npm run build --workspace shared",
+    "shared:watch": "npm run dev --workspace shared",
+    "dev": "concurrently -k -n shared,backend,frontend -c yellow,green,cyan \"npm:shared:watch\" \"npm:dev --workspace backend\" \"npm:dev --workspace frontend\"",
     "build": "npm run build --workspace shared && npm run build --workspace backend && npm run build --workspace frontend",
     "start": "concurrently -k -n backend,frontend -c green,cyan \"npm:start --workspace backend\" \"npm:start --workspace frontend\"",
     "db:migrate": "npm run prisma:migrate --workspace backend",

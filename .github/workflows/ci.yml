@@ -6,20 +6,29 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
-      - run: npm install --no-audit --no-fund
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Install
+        # `npm ci` requires a lockfile (now committed). --ignore-scripts skips
+        # backend's prisma postinstall + shared's prepare — we run them below
+        # explicitly so failures are visible per step.
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Build shared
+        run: npm run build --workspace shared
       - name: Generate Prisma client
         run: npx prisma generate
         working-directory: backend
-      - name: TypeScript — shared
-        run: npx tsc -p tsconfig.json --noEmit
-        working-directory: shared
       - name: TypeScript — backend
         run: npx tsc -p tsconfig.json --noEmit
         working-directory: backend

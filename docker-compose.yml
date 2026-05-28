@@ -34,8 +34,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     container_name: gpt-backend
     restart: unless-stopped
     depends_on:
@@ -58,11 +58,16 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+        NEXT_PUBLIC_ADSENSE_CLIENT: ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
+        NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR: ${NEXT_PUBLIC_ADSENSE_SLOT_SIDEBAR:-}
+        NEXT_PUBLIC_ADSENSE_SLOT_FOOTER: ${NEXT_PUBLIC_ADSENSE_SLOT_FOOTER:-}
+        NEXT_PUBLIC_ADBLOCK_NOTICE: ${NEXT_PUBLIC_ADBLOCK_NOTICE:-true}
+        NEXT_PUBLIC_OVERWOLF_DOWNLOAD_URL: ${NEXT_PUBLIC_OVERWOLF_DOWNLOAD_URL:-}
     container_name: gpt-frontend
     restart: unless-stopped
     depends_on:

@@ -14,7 +14,7 @@ export class NotificationsService {
         level: opts.level ?? 'info',
         title: opts.title,
         body: opts.body,
-        data: opts.data ?? undefined,
+        data: opts.data ? (opts.data as object) : undefined,
       },
     });
   }

@@ -10,8 +10,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BACKEND: ${{ github.repository_owner }}/gamepulsetracker-backend
-  IMAGE_FRONTEND: ${{ github.repository_owner }}/gamepulsetracker-frontend
+  # Forward-compat: opt into Node 24 runtime for JS actions ahead of the
+  # June 2026 default switch. Safe — actions that haven't migrated yet still
+  # run; this just suppresses the deprecation warning.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   build:
@@ -25,10 +27,8 @@ jobs:
       matrix:
         include:
           - image: backend
-            context: ./backend
             dockerfile: ./backend/Dockerfile
           - image: frontend
-            context: ./frontend
             dockerfile: ./frontend/Dockerfile
 
     steps:
@@ -68,7 +68,8 @@ jobs:
       - name: Build${{ github.event_name != 'pull_request' && ' and push' || '' }}
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
+          # Monorepo context — the Dockerfiles also need shared/.
+          context: .
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}

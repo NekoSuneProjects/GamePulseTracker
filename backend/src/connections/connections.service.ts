@@ -49,7 +49,7 @@ export class ConnectionsService {
         platform: input.platform,
         providerId: input.providerId,
         displayName: input.displayName,
-        meta: input.meta ?? {},
+        meta: (input.meta ?? {}) as object,
         verified: input.verified ?? false,
         autoResolve: input.autoResolve ?? true,
         identityHistory: history as unknown as object,

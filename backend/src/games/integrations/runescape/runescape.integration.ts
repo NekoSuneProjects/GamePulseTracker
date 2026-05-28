@@ -74,11 +74,10 @@ export class RunescapeIntegration implements GameIntegration {
         xp: overall.xp,
         rank: overall.rank > 0 ? `#${overall.rank.toLocaleString()}` : undefined,
       },
-      details: Object.fromEntries(
-        Object.entries(skills).map(([k, v]) => [`${k}_level`, v.level] as const).concat(
-          Object.entries(skills).map(([k, v]) => [`${k}_xp`, v.xp]),
-        ),
-      ),
+      details: Object.fromEntries([
+        ...Object.entries(skills).map(([k, v]) => [`${k}_level`, v.level] as [string, number]),
+        ...Object.entries(skills).map(([k, v]) => [`${k}_xp`,    v.xp]    as [string, number]),
+      ]),
       fetchedAt: new Date().toISOString(),
     };
   }
