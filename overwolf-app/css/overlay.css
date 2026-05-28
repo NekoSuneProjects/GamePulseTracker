@@ -1,0 +1,28 @@
+html, body { margin: 0; padding: 0; background: transparent; }
+.overlay {
+  font: 13px system-ui, sans-serif;
+  color: #d3d8e2;
+}
+.overlay-card {
+  margin: 12px;
+  padding: 10px 14px;
+  background: rgba(10, 13, 18, 0.78);
+  border: 1px solid rgba(0,230,118,0.4);
+  border-radius: 12px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 18px rgba(0,230,118,0.25);
+  backdrop-filter: blur(8px);
+}
+.dot {
+  width: 10px; height: 10px; border-radius: 999px;
+  background: #00e676;
+  box-shadow: 0 0 12px rgba(0,230,118,0.7);
+  animation: live 1.6s infinite ease-in-out;
+}
+.text { display: flex; flex-direction: column; }
+.text strong { color: #00e676; }
+.text span { color: #aab2c2; font-size: 11px; }
+@keyframes live {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%      { transform: scale(1.3); opacity: .6; }
+}

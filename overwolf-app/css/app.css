@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+  --pulse: #00e676;
+  --ink-900: #0a0d12;
+  --ink-800: #0f141c;
+  --ink-700: #161d28;
+  --ink-600: #212a39;
+  --ink-200: #aab2c2;
+  --ink-100: #d3d8e2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font: 14px/1.5 system-ui, sans-serif;
+  background: var(--ink-900); color: var(--ink-100);
+  padding: 24px;
+}
+header h1 { margin: 0; font-size: 22px; }
+.subtitle { color: var(--ink-200); margin: 4px 0 16px; }
+
+.panel {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--ink-700);
+  border-radius: 14px; padding: 16px;
+  margin-bottom: 16px;
+}
+.panel h2 { margin: 0 0 12px; font-size: 16px; color: var(--pulse); }
+.hint { font-size: 12px; color: var(--ink-200); margin: 4px 0 12px; }
+
+label { display: block; margin: 8px 0; font-size: 13px; }
+input[type="text"], input[type="url"], input[type="password"] {
+  width: 100%; padding: 8px 10px;
+  background: var(--ink-800); border: 1px solid var(--ink-700);
+  border-radius: 8px; color: var(--ink-100); font-family: ui-monospace, monospace;
+}
+input:focus { outline: none; border-color: var(--pulse); box-shadow: 0 0 0 3px rgba(0,230,118,0.20); }
+
+.actions { display: flex; gap: 8px; margin-top: 8px; }
+button {
+  background: var(--ink-700); color: var(--ink-100);
+  border: 1px solid var(--ink-600); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; cursor: pointer;
+}
+button.primary { background: var(--pulse); color: #052016; border-color: var(--pulse); font-weight: 600; }
+button:hover { filter: brightness(1.08); }
+
+#status { margin-top: 10px; font-size: 12px; font-family: ui-monospace, monospace; }
+#status.ok  { color: var(--pulse); }
+#status.err { color: #ff6e6e; }
+
+#games { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.game-row { display: flex; align-items: center; gap: 8px; margin: 0; }
+.game-row input { width: 14px; height: 14px; }
+
+footer { margin-top: 16px; color: var(--ink-200); font-size: 12px; text-align: center; }
+footer a { color: var(--pulse); }

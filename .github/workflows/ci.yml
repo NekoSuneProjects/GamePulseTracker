@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm install --no-audit --no-fund
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: backend
+      - name: TypeScript — shared
+        run: npx tsc -p tsconfig.json --noEmit
+        working-directory: shared
+      - name: TypeScript — backend
+        run: npx tsc -p tsconfig.json --noEmit
+        working-directory: backend
+      - name: TypeScript — frontend
+        run: npx tsc --noEmit
+        working-directory: frontend

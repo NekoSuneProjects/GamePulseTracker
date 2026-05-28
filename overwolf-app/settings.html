@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>GamePulseTracker Companion · Settings</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <script src="js/config.js" defer></script>
+    <script src="js/transport.js" defer></script>
+    <script src="js/settings.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <h1>GamePulseTracker Companion</h1>
+      <p class="subtitle">Send in-game stats to your self-hosted tracker.</p>
+    </header>
+
+    <section class="panel">
+      <h2>Server</h2>
+      <label>Server URL
+        <input id="serverUrl" type="url" placeholder="https://gamepulse.example.com" />
+      </label>
+      <label>Device key (paste from /devices on your tracker)
+        <input id="deviceKey" type="password" placeholder="gpt_dev_..." />
+      </label>
+      <label>Provider id (your in-game username)
+        <input id="providerId" type="text" placeholder="MyUsername" />
+      </label>
+      <div class="actions">
+        <button id="test">Test connection</button>
+        <button id="save" class="primary">Save</button>
+      </div>
+      <div id="status"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Games to track</h2>
+      <p class="hint">Toggle off any game you don't want the companion sending data for.</p>
+      <div id="games"></div>
+    </section>
+
+    <footer>
+      <small>Companion v0.1.0 · See <a href="https://github.com/NekoSuneProjects/GamePulseTracker" target="_blank" rel="noopener">README + CLIENT.md</a> for the ingest spec.</small>
+    </footer>
+  </body>
+</html>

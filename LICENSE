@@ -1,0 +1,109 @@
+GamePulseTracker Community License
+Copyright (c) 2026 NekoSuneProjects and contributors
+
+This software is published under the spirit of the MIT License with the
+additional community terms below. The MIT terms are the legal core; the
+additional clauses are author intent and serve as a notice to users. For
+authoritative legal protection in your jurisdiction please consult a
+qualified lawyer — the maintainers cannot give legal advice.
+
+----------------------------------------------------------------------
+MIT-style permission
+----------------------------------------------------------------------
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice, this permission notice, and the additional
+community terms below shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+----------------------------------------------------------------------
+Additional community terms (intent and conditions of use)
+----------------------------------------------------------------------
+
+1. CONTRIBUTIONS ARE WELCOME
+   You may fork, modify, and submit pull requests, feature suggestions, new
+   game integrations, bug fixes, and documentation improvements. Contributors
+   retain copyright in their contributions and license them to the project
+   under these same terms.
+
+2. NO IMPERSONATION OR FALSE ATTRIBUTION
+   You may not claim authorship of the Software as a whole or of any
+   contribution you did not make. You may not redistribute the Software under
+   a name that implies it is the original or an official version of
+   GamePulseTracker without prior written permission from the maintainers.
+
+3. NO ABUSE OF UPSTREAM GAME APIs
+   The Software queries a number of third-party APIs (Hypixel, Wargaming,
+   Jagex, Riot, Bungie, Steam, ScoreSaber, warframe.market, warframestat.us,
+   gametools.network, etc.). Every operator MUST:
+     (a) honour each provider's terms of service, robots.txt, and stated
+         rate limits;
+     (b) configure caching and back-off so that one operator's deployment
+         does not degrade service for others;
+     (c) NOT use this Software to scrape data the provider has explicitly
+         disallowed, nor to circumvent provider rate limits, paywalls, or
+         authentication;
+     (d) NOT use the Software to redistribute, sell, or sublicense data
+         received from a provider in violation of that provider's terms.
+
+4. NO MALICIOUS USE
+   The Software, including the companion ingest pipeline and any Overwolf
+   companion built from this repo, must NOT be used to:
+     - facilitate cheating in any game (e.g. wallhacks, ESP, automation
+       providing a competitive advantage);
+     - collect personally-identifying information about other players without
+       their explicit consent;
+     - hook into anti-cheat-protected processes, read protected memory, or
+       inject DLLs into games;
+     - distribute malware, ransomware, spyware, or any code designed to harm
+       systems or users.
+
+5. COMMUNITY PROJECT, AT YOUR OWN RISK
+   This is a volunteer community project. Upstream game APIs may change,
+   rate-limit your operator, or shut down without notice. Self-hosted
+   operators are solely responsible for:
+     - the security and uptime of their deployment;
+     - the credentials they store (JWT secrets, OAuth tokens, device keys,
+       database passwords);
+     - the data they collect from their users;
+     - compliance with applicable laws (GDPR, CCPA, etc.) in their
+       jurisdiction and their users' jurisdictions;
+     - the conduct of their users.
+
+   The maintainers of GamePulseTracker are not liable for any losses or
+   damages arising from your deployment, configuration, or operation of the
+   Software. Any modifications you make to your own deployment are your own
+   responsibility.
+
+6. ADVERTISING + ANALYTICS
+   The Software includes optional Google AdSense integration. If you enable
+   it on your deployment you are solely responsible for complying with
+   Google's program policies (including ads.txt placement, privacy policies,
+   GDPR consent banners, etc.). The maintainers do not place any ads or
+   analytics in the repository by default.
+
+7. NO ENDORSEMENT
+   References to specific games, game studios, platforms, or third-party
+   services in source code, documentation, and the game catalog are factual.
+   No endorsement by those parties is implied. All trademarks belong to their
+   respective owners.
+
+8. SEVERABILITY
+   If any clause above is held unenforceable by a court of competent
+   jurisdiction, the remaining clauses remain in full force.
+
+----------------------------------------------------------------------
+END OF LICENSE

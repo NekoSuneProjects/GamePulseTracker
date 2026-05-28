@@ -1,0 +1,28 @@
+{
+  "name": "gamepulsetracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted real-time multi-game player statistics platform.",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c green,cyan \"npm:dev --workspace backend\" \"npm:dev --workspace frontend\"",
+    "build": "npm run build --workspace shared && npm run build --workspace backend && npm run build --workspace frontend",
+    "start": "concurrently -k -n backend,frontend -c green,cyan \"npm:start --workspace backend\" \"npm:start --workspace frontend\"",
+    "db:migrate": "npm run prisma:migrate --workspace backend",
+    "db:seed": "npm run prisma:seed --workspace backend",
+    "db:studio": "npm run prisma:studio --workspace backend",
+    "docker:up": "docker compose --env-file .env up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f --tail=200"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

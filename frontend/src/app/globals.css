@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    @apply bg-ink-950 text-ink-100 font-sans antialiased;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(0, 230, 118, 0.10), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(0, 230, 118, 0.05), transparent 50%),
+      linear-gradient(180deg, #05070a 0%, #0a0d12 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-ink-900/60 backdrop-blur-xl border border-ink-700/60 rounded-2xl;
+  }
+  .glass-strong {
+    @apply bg-ink-900/85 backdrop-blur-xl border border-ink-700/80 rounded-2xl;
+  }
+  .neon-text   { @apply text-pulse-400; text-shadow: 0 0 18px rgba(0,230,118,0.45); }
+  .neon-border { box-shadow: 0 0 0 1px rgba(0,230,118,0.4), 0 0 28px rgba(0,230,118,0.25); }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium
+           transition-all duration-150 ease-out
+           focus:outline-none focus:ring-2 focus:ring-pulse-500/60;
+  }
+  .btn-primary  { @apply btn bg-pulse-500 text-ink-950 hover:bg-pulse-400 hover:shadow-glow-sm; }
+  .btn-ghost    { @apply btn bg-ink-800/60 text-ink-100 hover:bg-ink-700/70 border border-ink-700/60; }
+  .btn-danger   { @apply btn bg-red-500/90 text-white hover:bg-red-400; }
+
+  .input {
+    @apply w-full px-3 py-2 bg-ink-900/70 border border-ink-700 rounded-xl
+           text-ink-100 placeholder-ink-400
+           focus:outline-none focus:border-pulse-500 focus:ring-2 focus:ring-pulse-500/30;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full
+           bg-pulse-500/15 text-pulse-300 border border-pulse-500/30;
+  }
+  .chip-muted {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full
+           bg-ink-700/60 text-ink-200 border border-ink-600/60;
+  }
+
+  .live-dot {
+    @apply inline-block h-2 w-2 rounded-full bg-pulse-400;
+    box-shadow: 0 0 0 4px rgba(0, 230, 118, 0.15);
+    animation: livepulse 1.6s ease-in-out infinite;
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, transparent, rgba(0,230,118,0.10), transparent);
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+}
+
+@keyframes livepulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(0, 230, 118, 0.6); }
+  50%      { box-shadow: 0 0 0 10px rgba(0, 230, 118, 0.0); }
+}

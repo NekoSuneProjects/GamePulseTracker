@@ -1,0 +1,346 @@
+// GamePulseTracker — Prisma schema
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Users + auth
+// ----------------------------------------------------------------------------
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(USER)
+  emailVerified Boolean  @default(false)
+  avatarUrl     String?
+  publicProfile Boolean  @default(true)
+  bio           String?
+  /// SocialLink[] from @gpt/shared (twitter/twitch/youtube/...).
+  socials       Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions          Session[]
+  linkedAccounts    LinkedAccount[]
+  trackedProfiles   TrackedProfile[]
+  notifications     Notification[]
+  passwordResets    PasswordReset[]
+  apiKeys           ApiKey[]
+  devices           Device[]
+
+  @@index([role])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshHash  String
+  userAgent    String?
+  ip           String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String
+  keyHash   String   @unique
+  prefix    String   // first 8 chars for display
+  rateLimit Int      @default(60) // requests per minute
+  lastUsed  DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// External platform linking (EA, Steam, Bungie, Epic, ...)
+// ----------------------------------------------------------------------------
+model LinkedAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  platform      String   // 'epic', 'ea', 'steam', 'bungie', 'riot', 'xbl', 'psn', 'discord', 'minecraft', 'activision'
+  providerId    String   // platform's CURRENT stable id (uuid, steamid64, bungie membership id, ...)
+  displayName   String
+
+  /// JSON blob with provider-specific fields (oauth tokens, refresh tokens, etc.)
+  /// Tokens should be encrypted at rest in production.
+  meta          Json     @default("{}")
+  verified      Boolean  @default(false)
+
+  /// IdentityHistoryEntry[] — captures previous providerIds the same linked
+  /// account used to resolve to. Updated by the IdentityResolveScheduler
+  /// whenever the platform's username→stable-id mapping changes.
+  identityHistory Json   @default("[]")
+  /// When we last verified providerId still matches what the platform reports.
+  lastResolvedAt DateTime?
+  /// Optional autoResolve flag — defaults true, can be turned off per-account.
+  autoResolve    Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, providerId])
+  @@index([userId])
+  @@index([platform])
+  @@index([lastResolvedAt])
+}
+
+// ----------------------------------------------------------------------------
+// Per-game player profiles tracked by the platform
+// (Composite key includes platform so e.g. PSN Apex and Origin Apex are distinct.)
+// ----------------------------------------------------------------------------
+model TrackedProfile {
+  id            String   @id @default(cuid())
+  /// Null if this profile is unclaimed.
+  userId        String?
+  game          String   // GameSlug from shared catalog
+  /// '_' for platform-agnostic games (Hypixel, Wynncraft, OSRS, RS3, ...).
+  platform      String   @default("_")
+  providerId    String   // stable id within the game's own provider
+  displayName   String
+  avatarUrl     String?
+
+  /// Latest normalized snapshot from integration (NormalizedProfile JSON).
+  latestSnapshot Json?
+  providerUpdatedAt DateTime?
+  lastFetchedAt    DateTime?
+  lastAttemptedAt  DateTime?
+  /// Per-profile refresh interval override (ms).
+  refreshIntervalMs Int?
+  active        Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user      User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  matches   MatchRecord[]
+  seasons   SeasonRecord[]
+  snapshots StatSnapshot[]
+
+  @@unique([game, platform, providerId])
+  @@index([userId])
+  @@index([game, platform])
+  @@index([lastFetchedAt])
+}
+
+model StatSnapshot {
+  id          String   @id @default(cuid())
+  profileId   String
+  payload     Json
+  level       Int?
+  xp          BigInt?
+  rank        String?
+  rankTier    Int?
+  kd          Float?
+  wins        Int?
+  losses      Int?
+  matches     Int?
+  createdAt   DateTime @default(now())
+
+  profile TrackedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
+}
+
+model MatchRecord {
+  id           String   @id @default(cuid())
+  profileId    String
+  matchId      String
+  playedAt     DateTime
+  mode         String?
+  map          String?
+  result       String?
+  kills        Int?
+  deaths       Int?
+  assists      Int?
+  score        Int?
+  durationSec  Int?
+  details      Json?
+
+  profile TrackedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, matchId])
+  @@index([profileId, playedAt])
+}
+
+model SeasonRecord {
+  id          String   @id @default(cuid())
+  profileId   String
+  seasonId    String
+  label       String
+  startedAt   DateTime?
+  endedAt     DateTime?
+  rank        String?
+  rankTier    Int?
+  stats       Json     @default("{}")
+
+  profile TrackedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, seasonId])
+  @@index([profileId])
+}
+
+// ----------------------------------------------------------------------------
+// Leaderboards (cached)
+// ----------------------------------------------------------------------------
+model LeaderboardSnapshot {
+  id        String   @id @default(cuid())
+  game      String
+  platform  String   @default("_")
+  metric    String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@unique([game, platform, metric, createdAt])
+  @@index([game, platform, metric])
+}
+
+// ----------------------------------------------------------------------------
+// Cached raw integration responses
+// ----------------------------------------------------------------------------
+model IntegrationCache {
+  id        String   @id @default(cuid())
+  game      String
+  endpoint  String
+  key       String
+  payload   Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([game, endpoint, key])
+  @@index([expiresAt])
+}
+
+// ----------------------------------------------------------------------------
+// News (per game, aggregated from RSS / integration getNews)
+// ----------------------------------------------------------------------------
+model NewsItem {
+  id          String   @id            // stable id from source (URL hash or guid)
+  game        String
+  title       String
+  url         String
+  source      String
+  summary     String?  @db.Text
+  imageUrl    String?
+  tags        Json     @default("[]")
+  publishedAt DateTime
+  fetchedAt   DateTime @default(now())
+
+  @@index([game, publishedAt])
+  @@unique([game, url])
+}
+
+// ----------------------------------------------------------------------------
+// Notifications
+// ----------------------------------------------------------------------------
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  level     String   @default("info")
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+// ----------------------------------------------------------------------------
+// Audit log
+// ----------------------------------------------------------------------------
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  target    String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([actorId])
+}
+
+// ----------------------------------------------------------------------------
+// Companion devices (Overwolf overlay, desktop ingest clients)
+// ----------------------------------------------------------------------------
+model Device {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String                          // user-chosen, e.g. "Gaming PC Overwolf"
+  /// SHA-256 of the device key. The plaintext key is shown ONCE on pairing.
+  keyHash   String   @unique
+  prefix    String                           // first 8 chars for display
+  /// Which game slugs this device is allowed to ingest for. Empty = all.
+  scopes    Json     @default("[]")
+  /// Pairing code (short, user-readable) and its expiry, only set during pairing.
+  pairingCode      String?
+  pairingExpiresAt DateTime?
+  rateLimit Int      @default(120)           // ingest events per minute
+  lastSeen  DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([pairingCode])
+}
+
+// ----------------------------------------------------------------------------
+// Ingest events (every payload posted by a Device, retained for audit/replay).
+// ----------------------------------------------------------------------------
+model IngestEvent {
+  id        String   @id @default(cuid())
+  deviceId  String
+  game      String
+  platform  String   @default("_")
+  providerId String
+  /// Full IngestPayload from @gpt/shared.
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([deviceId, createdAt])
+  @@index([game, providerId, createdAt])
+}
