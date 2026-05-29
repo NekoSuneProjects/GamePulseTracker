@@ -1,40 +1,54 @@
 import Link from 'next/link';
-import { SearchBar } from '@/components/SearchBar';
 import { NewsList } from '@/components/NewsList';
 import { ShopGrid } from '@/components/ShopGrid';
+import { GameHero } from '@/components/GameHero';
+import { GameSubNav } from '@/components/GameSubNav';
+import { GameTopStats, type LeaderRow, type MetricBlock } from '@/components/GameTopStats';
 import { serverFetch } from '@/lib/api-server';
 import type { GameSlug, NewsItem, ShopResponse } from '@gpt/shared';
+import { getGame } from '@gpt/shared';
 
 interface RecentRow {
   id: string; game: string; platform: string; providerId: string;
   displayName: string; avatarUrl?: string; lastFetchedAt: string | null;
 }
 
-/** Games whose integrations implement getShop(). Hard-coded here rather
- *  than discovered at runtime — the catalog isn't published to the client. */
 const SHOP_GAMES = new Set(['fortnite']);
+
+const METRICS: Array<{ label: string; metric: MetricBlock['metric'] }> = [
+  { label: 'Top level',   metric: 'level' },
+  { label: 'Top K/D',     metric: 'kd' },
+  { label: 'Top wins',    metric: 'wins' },
+  { label: 'Top matches', metric: 'matches' },
+];
 
 export default async function GamePage({ params }: { params: { game: string } }) {
   const wantsShop = SHOP_GAMES.has(params.game);
-  const [recentAll, newsRaw, shop] = await Promise.all([
+  const game = getGame(params.game);
+  const displayName = game?.name ?? params.game;
+
+  const [recentAll, newsRaw, shop, ...metricResults] = await Promise.all([
     serverFetch<RecentRow[]>(`/stats/recent?limit=24`),
     serverFetch<NewsItem[]>(`/news/${encodeURIComponent(params.game)}?limit=9`),
     wantsShop ? serverFetch<ShopResponse>(`/games/${encodeURIComponent(params.game)}/shop`) : Promise.resolve(null),
+    ...METRICS.map(m => serverFetch<LeaderRow[]>(`/leaderboards/${encodeURIComponent(params.game)}?metric=${m.metric}&limit=2`)),
   ]);
-  // Defensive: API contract drift (or a stale snapshot reaching us as an
-  // object instead of an array) used to throw "_.filter is not a function"
-  // on this page. Guard against non-array shapes regardless of type.
+
   const recent = (Array.isArray(recentAll) ? recentAll : []).filter(r => r.game === params.game);
   const news = Array.isArray(newsRaw) ? newsRaw : [];
 
-  return (
-    <div className="space-y-10">
-      <header className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-3xl font-display font-semibold capitalize">{params.game.replace(/-/g, ' ')}</h1>
-        <Link href={`/leaderboards?game=${params.game}`} className="chip">Leaderboard →</Link>
-      </header>
+  const blocks: MetricBlock[] = METRICS.map((m, i) => ({
+    label: m.label,
+    metric: m.metric,
+    rows: Array.isArray(metricResults[i]) ? (metricResults[i] as LeaderRow[]) : [],
+  }));
 
-      <SearchBar defaultGame={params.game as GameSlug} />
+  return (
+    <div className="space-y-8">
+      <GameHero slug={params.game as GameSlug} name={displayName} />
+      <GameSubNav slug={params.game} />
+
+      <GameTopStats game={params.game} blocks={blocks} />
 
       <section>
         <h2 className="text-lg font-display font-semibold mb-3">Latest news</h2>

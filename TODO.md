@@ -40,36 +40,50 @@ on a deploy before being moved to Done.)
 Per screenshots: Tracker.gg's hub + per-game pages have a much more
 identifiable structure. Mimic the SHAPE (not the brand):
 
-- [ ] Top-level "TRACKER" header with a horizontal list of game shortcuts.
-- [ ] Per-game subnav: `Home / Leaderboards / App / Premium`.
-- [ ] Game-hero banner (full-bleed game art, title overlay).
-- [ ] Centered platform-aware search bar with PSN / Xbox / Epic dropdown
-      and a "Recent Players" + "Favorites" side panel.
-- [ ] Top stats cards on landing pages (e.g. "Player Kills", "Player Rank",
-      "Wins") sourced from leaderboards.
-- [ ] My Games grid (hub) like the screenshot — game tiles 4x2 grid with
-      cover art instead of the current solid-color tiles.
-- [ ] Battlefield series landing page: variant picker (BF6 / BF2042 / BFV
-      / BF1) before drilling into a player.
+- [x] Top-level "TRACKER" header with horizontal game shortcuts —
+      `Navbar` now has a 2-row layout: brand + main routes + user
+      actions on top, scrollable live-games shortcut bar below.
+- [x] Per-game subnav: `Home / Leaderboards / Live` (Premium dropped;
+      App replaced by Live per OSS / no-paywalls intent).
+- [x] Game-hero banner — `GameHero` component renders the per-game
+      accent gradient + title overlay with an embedded SearchBar.
+- [x] Centered platform-aware search bar — already existed; now also
+      sits inside the hero on the per-game page.
+- [x] "Recent Players" + "Favorites" side panel — `HubSidePanel` on
+      the home page, Favorites only renders for logged-in users.
+- [x] Top stats cards on landing pages — `GameTopStats` pulls top-of-
+      leaderboard rows for level/KD/wins/matches and renders one card
+      per non-empty metric, linking to the leader's profile.
+- [x] My Games grid — `GameTile` rebuilt with `bg-gradient-to-br` from
+      a per-game accent map (`GAME_ACCENTS` in `@gpt/shared`). Tiles
+      now have 16:9 aspect, branded gradient, dark text-readability
+      overlay, and a status chip. No cover-art assets required.
+- [x] Battlefield series landing page — `/games/battlefield` lists
+      every BF title in the catalog as branded gradient cards; titles
+      we don't have integrations for yet are dimmed + non-clickable
+      with a "not yet" chip.
 
 ## 🔗 Linked Accounts redesign (Tracker Network "Account Management" style)
 
-Per screenshots from `thetrackernetwork.com/manage/social`. Replace the
-current flat list with a card-grid Account Management page:
-
-- [ ] Sidebar nav: Premium Membership / Premium Settings / Linked Accounts
-      / Geo Settings / Change Username / Change Email / Change Password /
-      Delete Account. (Settings becomes sub-routes, not one big form.)
-- [ ] "Gaming Platforms" grid of branded color cards: Xbox Live (green),
-      PlayStation (blue), Steam (olive), Origin (orange), Ubisoft (blue),
-      Battle.net (light blue), Epic Games (dark), Riot Games (red),
-      Activision (black), Sharkmob (gray), FACEIT (orange), Bungie (cyan).
-      Each card shows brand logo + handle + verified-check + trash icon.
-- [ ] "Social Platforms" grid: Twitch, YouTube, Discord, Twitter, Reddit
-      (same card shape, branded colors).
-- [ ] Verified badge after each handle when `verified=true`.
-- [ ] Click a card to re-resolve / unlink / re-verify.
-- [ ] Empty cards (no link yet) show a "+ Link" prompt.
+- [x] Sidebar nav — `settings/layout.tsx` renders a left-rail nav with
+      Profile / Linked accounts / Connections (legacy) / Change username
+      / Change password / Devices. Premium/Geo/Delete-account omitted —
+      no paywalls (OSS), delete-account is its own TODO under Auth.
+- [x] "Gaming Platforms" grid — `settings/linked` renders one card per
+      platform in `lib/platform-brands.GAMING_BRANDS` (12 platforms with
+      brand-coloured gradients: Xbox green, PSN blue, Steam stone, EA
+      red/orange, Ubisoft blue, Battle.net sky, Epic zinc, Riot red,
+      Activision stone, FACEIT orange, Bungie cyan, plus a generic EA
+      slot). Trademark-safe: brand colours + abbreviation only, no logo
+      art.
+- [x] "Social Platforms" grid — 5 cards (Twitch / YouTube / Discord /
+      Twitter-X / Reddit) edit `User.socials` directly via the existing
+      `/users/me/settings` PATCH.
+- [x] Verified badge — green check on linked cards when
+      `LinkedAccount.verified=true`.
+- [x] Click a card → re-resolve / unlink inline action; empty card opens
+      an inline link form with providerId + display name.
+- [x] Empty cards show a "+ Link account" / "+ Add" prompt.
 
 ## 📺 OBS overlays (Tracker.gg /overlays style)
 

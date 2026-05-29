@@ -2,7 +2,17 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   darkMode: 'class',
-  content: ['./src/**/*.{ts,tsx}'],
+  content: ['./src/**/*.{ts,tsx}', './node_modules/@gpt/shared/dist/**/*.js'],
+  /**
+   * Game accent + brand color classes are referenced from data tables
+   * (GAME_ACCENTS, PLATFORM_BRANDS) rather than appearing as static class
+   * names, so Tailwind's content-scan won't pick them up. Safelist the
+   * colour fragments we actually use so PurgeCSS doesn't strip them.
+   */
+  safelist: [
+    { pattern: /^(bg|from|to|via|text|border)-(yellow|orange|red|rose|pink|fuchsia|purple|violet|indigo|blue|sky|cyan|teal|emerald|green|lime|amber|stone|zinc|slate|gray|neutral)-(50|100|200|300|400|500|600|700|800|900|950)$/ },
+    { pattern: /^bg-gradient-to-(br|bl|tr|tl|r|l|t|b)$/ },
+  ],
   theme: {
     extend: {
       colors: {

@@ -15,6 +15,12 @@ export interface GameCatalogEntry {
   live: boolean;
   ingestOnly?: boolean;
   platforms: readonly string[];
+  /** Short marketing-style tagline shown on hub tiles. Optional. */
+  tagline?: string;
+  /** UI category for grouping in the hub. */
+  category?: 'shooter' | 'mmo' | 'mc' | 'survival' | 'mobile' | 'vr' | 'moba' | 'racing' | 'other';
+  /** Tailwind classes for the tile gradient ("from-... to-..."). Renders behind the title. */
+  accent?: string;
 }
 
 export const PLATFORM_SENTINEL = '_';
@@ -85,6 +91,66 @@ export const GAME_CATALOG = [
 
 export type GameSlug = typeof GAME_CATALOG[number]['slug'];
 export const GAME_SLUGS: readonly GameSlug[] = GAME_CATALOG.map(g => g.slug);
+
+/**
+ * Per-game UI accents. Kept separate from the catalog rather than baked into
+ * every entry so adding a new game doesn't force the operator to pick a
+ * colour palette before they ship — entries without an accent get a neutral
+ * fallback in the UI.
+ *
+ * Values are Tailwind gradient class fragments — the consumer composes
+ * `bg-gradient-to-br <accent>`.
+ */
+export const GAME_ACCENTS: Partial<Record<GameSlug, string>> = {
+  hypixel:           'from-yellow-600 to-red-700',
+  wynncraft:         'from-teal-600 to-blue-800',
+  osrs:              'from-amber-700 to-yellow-900',
+  runescape:         'from-orange-700 to-amber-900',
+  'clash-of-clans':  'from-yellow-500 to-red-700',
+  warframe:          'from-amber-400 to-zinc-800',
+  wot:               'from-stone-600 to-zinc-900',
+  wows:              'from-blue-700 to-slate-900',
+  wowp:              'from-sky-700 to-slate-900',
+  roblox:            'from-red-600 to-rose-900',
+  'beat-saber':      'from-pink-500 to-cyan-500',
+  'vrchat-worlds':   'from-violet-600 to-fuchsia-900',
+  fortnite:          'from-yellow-400 to-purple-700',
+  apex:              'from-orange-600 to-red-900',
+  valorant:          'from-red-600 to-rose-950',
+  'overwatch-2':     'from-orange-400 to-amber-700',
+  'r6-siege':        'from-slate-700 to-orange-700',
+  'rocket-league':   'from-cyan-500 to-pink-600',
+  'halo-infinite':   'from-blue-600 to-indigo-900',
+  splitgate:         'from-purple-600 to-blue-900',
+  'marvel-rivals':   'from-red-500 to-blue-700',
+  bloodhunt:         'from-red-800 to-zinc-950',
+  destiny:           'from-amber-600 to-stone-900',
+  'destiny-2':       'from-amber-500 to-stone-900',
+  'battlefield-1':       'from-amber-700 to-stone-900',
+  'battlefield-3':       'from-blue-700 to-zinc-900',
+  'battlefield-4':       'from-orange-600 to-zinc-900',
+  'battlefield-5':       'from-stone-600 to-zinc-900',
+  'battlefield-hardline':'from-yellow-600 to-red-800',
+  'battlefield-2042':    'from-amber-600 to-stone-900',
+  'cod-warzone':     'from-emerald-700 to-zinc-900',
+  'cod-cold-war':    'from-orange-700 to-zinc-900',
+  'cod-mwii':        'from-stone-600 to-zinc-900',
+  'cod-mwiii':       'from-stone-700 to-zinc-900',
+  'cod-bo6':         'from-orange-600 to-zinc-900',
+  'the-division':    'from-orange-500 to-zinc-900',
+  'the-division-2':  'from-orange-600 to-zinc-900',
+  'for-honor':       'from-red-700 to-stone-900',
+  cs2:               'from-yellow-600 to-stone-900',
+  lol:               'from-amber-500 to-blue-900',
+  tft:               'from-purple-500 to-blue-900',
+  'arc-raiders':     'from-emerald-600 to-zinc-900',
+};
+
+export const GAME_ACCENT_FALLBACK = 'from-pulse-600 to-ink-900';
+
+export function gameAccent(slug: string): string {
+  return GAME_ACCENTS[slug as GameSlug] ?? GAME_ACCENT_FALLBACK;
+}
 
 export function getGame(slug: string): GameCatalogEntry | undefined {
   return GAME_CATALOG.find(g => g.slug === slug);
