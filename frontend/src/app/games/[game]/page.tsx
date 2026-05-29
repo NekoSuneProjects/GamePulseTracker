@@ -14,8 +14,11 @@ export default async function GamePage({ params }: { params: { game: string } })
     serverFetch<RecentRow[]>(`/stats/recent?limit=24`),
     serverFetch<NewsItem[]>(`/news/${encodeURIComponent(params.game)}?limit=9`),
   ]);
-  const recent = (recentAll ?? []).filter(r => r.game === params.game);
-  const news = newsRaw ?? [];
+  // Defensive: API contract drift (or a stale snapshot reaching us as an
+  // object instead of an array) used to throw "_.filter is not a function"
+  // on this page. Guard against non-array shapes regardless of type.
+  const recent = (Array.isArray(recentAll) ? recentAll : []).filter(r => r.game === params.game);
+  const news = Array.isArray(newsRaw) ? newsRaw : [];
 
   return (
     <div className="space-y-10">

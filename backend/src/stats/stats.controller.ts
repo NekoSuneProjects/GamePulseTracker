@@ -1,16 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Public } from '../common/decorators/public.decorator';
+import { migrateAvatarUrlOn } from '../common/util/avatar';
 import { ApiTags } from '@nestjs/swagger';
-
-const CRAFATAR_RE = /crafatar\.com\/(?:avatars|renders\/body)\/([0-9a-f-]+)/i;
-function migrateAvatar<T extends { avatarUrl?: string | null }>(row: T): T {
-  if (typeof row.avatarUrl === 'string') {
-    const m = CRAFATAR_RE.exec(row.avatarUrl);
-    if (m) row.avatarUrl = `https://mc-heads.net/body/${m[1]}/right`;
-  }
-  return row;
-}
 
 @ApiTags('stats')
 @Controller('stats')
@@ -30,7 +22,7 @@ export class StatsController {
         lastFetchedAt: true, latestSnapshot: true,
       },
     });
-    return { ok: true, data: rows.map(migrateAvatar) };
+    return { ok: true, data: rows.map(migrateAvatarUrlOn) };
   }
 
   @Public()

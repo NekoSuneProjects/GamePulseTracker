@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { IntegrationRegistry } from './integrations/integration.registry';
 import { DEFAULT_TTL, normalisePlatform } from './integrations/integration.interface';
+import { normaliseAvatarUrl } from '../common/util/avatar';
 
 @Injectable()
 export class GamesService {
@@ -193,16 +194,9 @@ export class GamesService {
     if (!snap || typeof snap !== 'object') return snap;
     const s = snap as Record<string, unknown>;
     if (typeof s.avatarUrl === 'string') {
-      s.avatarUrl = this.normaliseAvatarUrl(s.avatarUrl);
+      s.avatarUrl = normaliseAvatarUrl(s.avatarUrl) ?? s.avatarUrl;
     }
     return s;
-  }
-  private normaliseAvatarUrl(url: string): string {
-    // crafatar.com/avatars/<uuid>?…       → mc-heads.net/body/<uuid>/right
-    // crafatar.com/renders/body/<uuid>?…  → mc-heads.net/body/<uuid>/right
-    const m = /crafatar\.com\/(?:avatars|renders\/body)\/([0-9a-f-]+)/i.exec(url);
-    if (m) return `https://mc-heads.net/body/${m[1]}/right`;
-    return url;
   }
   private async recordSnapshot(profileId: string, snap: Record<string, unknown>) {
     const headline = (snap.headline ?? {}) as Record<string, number | string | undefined>;

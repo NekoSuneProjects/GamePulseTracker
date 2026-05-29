@@ -21,19 +21,19 @@ on a deploy before being moved to Done.)
 
 ## 🔥 Live blockers (fix next)
 
-- [ ] Crafatar 521 from `/_next/image` — switch Minecraft avatars to a more
-      reliable service and auto-rewrite old `crafatar.com/avatars/` URLs
-      already baked into DB snapshots.
-- [ ] Persistent `_.filter is not a function` after pull — investigate any
-      site we haven't already guarded with `Array.isArray()`. (Most likely
-      a stale snapshot's `recent` or `details` field shape.)
 - [x] User settings: change username + change password (shipped).
+- [x] Crafatar 521 — centralised `normaliseAvatarUrl` util now applied at
+      every read path (games, stats, leaderboards, users). Old DB rows
+      auto-rewrite on read; refreshed rows get mc-heads.net written back.
+- [x] `_.filter is not a function` — added `Array.isArray()` guards on the
+      pages that hit the issue (game hub, settings, connections, devices).
 
 ## 🚧 In progress
 
-- [ ] Restructure stale TrackedProfile rows that were created before the
-      canonical-platform fix — they may have `platform='_'` rows that
-      duplicate the canonical `platform='minecraft'` rows.
+- [x] **`platform='_'` dedupe migration** — `backend/prisma/scripts/
+      dedupe-canonical-platform.ts`. Run `npm run migrate:dedupe-platforms
+      -- --apply` on the deploy (dry-run by default). Reparents
+      Snapshot/Match/Season rows then deletes the stale `_` row.
 
 ## 🎨 UI redesign (Tracker.gg-style layout)
 
@@ -172,11 +172,12 @@ The request goes into a queue an admin approves or rejects.
 
 ## 🧠 Backend hardening
 
-- [ ] Drop NotFoundException for missing TrackedProfile rows everywhere
-      that calls `findUnique` — return `null`/`[]` so the UI handles it.
-- [ ] Snapshot reads should re-derive computed fields (avatar URLs,
-      recent links) instead of trusting whatever was stored, so old
-      snapshots inherit current logic.
+- [x] Drop NotFoundException for missing TrackedProfile rows — history,
+      matches, and findProfileLoose now return null / [] (verified). The
+      remaining NotFoundException uses are legitimate (integration slug
+      doesn't exist, linked account owned by another user).
+- [x] Snapshot reads re-derive avatar URL via `normaliseAvatarUrl` on
+      every read — covered by the Crafatar centralisation above.
 - [ ] Background queue: dedupe in-flight `refreshProfile(...)` calls.
 - [ ] Per-integration request log / metrics (Prometheus?) so we can
       see who's rate-limiting us.
@@ -184,8 +185,6 @@ The request goes into a queue an admin approves or rejects.
 
 ## 🛡 Auth + security
 
-- [ ] Change username (with password confirmation).
-- [ ] Change password (with current-password confirmation).
 - [ ] Delete account (soft-delete + 30-day undo).
 - [ ] Email verification flow (table already exists, SMTP not wired).
 - [ ] Password reset via email link.
@@ -202,8 +201,9 @@ The request goes into a queue an admin approves or rejects.
 
 ## 📰 News + content
 
-- [ ] News deduplication: hash by title+url so the same item from
-      multiple feeds doesn't appear twice.
+- [x] News deduplication: in-pass dedup by SHA1(normalised title + URL)
+      so the same article from multiple feeds for a single game refresh
+      no longer gets upserted twice.
 - [ ] Per-game news filtering by tag (patch, esports, cosmetic).
 - [ ] Battle pass / season banner on game hubs.
 

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException,
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import type { SocialLink, SocialKind } from '@gpt/shared';
+import { migrateAvatarUrlOn } from '../common/util/avatar';
 
 const SOCIAL_KINDS = new Set<SocialKind>(['twitter','twitch','youtube','discord','tiktok','kick','instagram','github','website']);
 
@@ -34,7 +35,7 @@ export class UsersService {
       socials: (user.socials as SocialLink[] | null) ?? [],
       createdAt: user.createdAt.toISOString(),
       linkedAccounts: user.linkedAccounts,
-      trackedProfiles: user.trackedProfiles,
+      trackedProfiles: user.trackedProfiles.map(migrateAvatarUrlOn),
     };
   }
 

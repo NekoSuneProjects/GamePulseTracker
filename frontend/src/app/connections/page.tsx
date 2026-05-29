@@ -30,7 +30,7 @@ export default function ConnectionsPage() {
 
   async function refresh() {
     const list = await api<LinkedAccount[] | null>('/connections', { auth: true });
-    setAccounts(list ?? []);
+    setAccounts(Array.isArray(list) ? list : []);
   }
 
   useEffect(() => {

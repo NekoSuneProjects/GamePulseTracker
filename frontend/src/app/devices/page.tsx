@@ -21,7 +21,7 @@ export default function DevicesPage() {
 
   async function refresh() {
     const list = await api<Device[] | null>('/devices', { auth: true });
-    setDevices(list ?? []);
+    setDevices(Array.isArray(list) ? list : []);
   }
 
   useEffect(() => {

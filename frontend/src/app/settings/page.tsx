@@ -39,7 +39,7 @@ export default function SettingsPage() {
     setAvatarUrl(user.avatarUrl ?? '');
     setPublicProfile(user.publicProfile ?? true);
     setBio(user.bio ?? '');
-    setSocials(user.socials ?? []);
+    setSocials(Array.isArray(user.socials) ? user.socials : []);
     setNewUsername(user.username);
   }, [loading, user, router]);
 

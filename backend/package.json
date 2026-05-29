@@ -13,6 +13,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "prisma studio",
+    "migrate:dedupe-platforms": "ts-node prisma/scripts/dedupe-canonical-platform.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

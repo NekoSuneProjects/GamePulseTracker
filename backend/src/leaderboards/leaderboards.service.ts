@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { normalisePlatform } from '../games/integrations/integration.interface';
+import { normaliseAvatarUrl } from '../common/util/avatar';
 
 type Metric = 'level' | 'kd' | 'wins' | 'matches';
 const ORDERABLE: Record<Metric, string> = { level: 'level', kd: 'kd', wins: 'wins', matches: 'matches' };
@@ -54,7 +55,7 @@ export class LeaderboardsService {
       providerId: r.providerId,
       displayName: r.displayName,
       platform: r.platform === '_' ? undefined : r.platform,
-      avatarUrl: r.avatarUrl ?? undefined,
+      avatarUrl: normaliseAvatarUrl(r.avatarUrl) ?? undefined,
       metricLabel: metric,
       metricValue: Number(r.value ?? 0),
     }));

@@ -1,9 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { IntegrationRegistry } from '../games/integrations/integration.registry';
 import { parseRssFeed } from '../games/integrations/rss.helper';
 import type { NewsItem, GameSlug } from '@gpt/shared';
+
+/**
+ * Stable dedup key for a news item: same article from multiple feeds (e.g.
+ * fallback RSS + integration getNews()) ends up with the same key, so we
+ * skip the duplicate within a single refresh pass.
+ *
+ * Normalisation: strip URL query/fragment, force lowercase host, collapse
+ * title whitespace + lowercase. We keep the path because legitimate sister
+ * articles on the same source share host+title-prefix but differ in path.
+ */
+function newsDedupKey(title: string, url: string): string {
+  let normUrl = url.trim();
+  try {
+    const u = new URL(url);
+    u.search = '';
+    u.hash = '';
+    u.hostname = u.hostname.toLowerCase();
+    normUrl = u.toString().replace(/\/$/, '');
+  } catch { /* leave as-is */ }
+  const normTitle = title.trim().replace(/\s+/g, ' ').toLowerCase();
+  return createHash('sha1').update(`${normTitle}|${normUrl}`).digest('hex');
+}
 
 /**
  * Fallback RSS feeds for games whose integrations don't implement getNews().
@@ -100,7 +123,14 @@ export class NewsService {
             if (fb) items = await parseRssFeed(fb.url, fb.slug, fb.source);
           }
 
+          // In-pass dedup: skip the second occurrence of the same article
+          // when multiple feeds report it (e.g. the integration's getNews
+          // + the fallback RSS for the same game).
+          const seenKeys = new Set<string>();
           for (const item of items.slice(0, 20)) {
+            const key = newsDedupKey(item.title, item.url);
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
             await this.prisma.newsItem.upsert({
               where: { game_url: { game: integ.slug, url: item.url } },
               update: { title: item.title, summary: item.summary, imageUrl: item.imageUrl, publishedAt: new Date(item.publishedAt), source: item.source, tags: item.tags ?? [] },
