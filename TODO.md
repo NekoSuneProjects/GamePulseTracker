@@ -5,6 +5,98 @@ Keep entries short; link issues / commits when they land.
 
 ---
 
+## 🛡 Security audit follow-ups
+
+(From the audit on 2026-05-29. Critical items in this section were fixed
+in-line; the rest are tracked here.)
+
+### Medium
+
+- [ ] **Pairing code uses `Math.random()`** — `devices.service.ts:80-85`.
+      Predictable PRNG over a 32^6 alphabet. Switch to `crypto.randomInt`.
+- [ ] **Refresh token reuse not detected** — `auth.service.ts:45-56`. When
+      a previously-rotated refresh is presented, treat as theft signal and
+      revoke the entire user's session family.
+- [ ] **`AllExceptionsFilter` leaks `exception.message`** for non-HTTP
+      exceptions (Prisma errors, raw constraint names). Return a generic
+      `INTERNAL_ERROR` message, log details server-side only.
+- [ ] **Swagger `/docs` exposed in production** by default. Gate
+      `SwaggerModule.setup` on `NODE_ENV !== 'production'` OR behind admin
+      auth + nginx ACL.
+- [ ] **`ApiKeyGuard` fail-open when feature off** — when
+      `PUBLIC_API_ENABLED !== 'true'` it returns true unconditionally. If
+      the feature is off, return 404; document the intended behaviour.
+- [ ] **Express `trust proxy` not set** — every audit row records the
+      loopback IP behind nginx. Set `app.set('trust proxy', 1)` and parse
+      `X-Forwarded-For`.
+
+### Low
+
+- [ ] **Frontend: socket singleton never disconnected on logout** —
+      subscriptions from a previous user persist across login. Add
+      `disconnectSocket()` to `lib/socket.ts` and call from `logout()`.
+- [ ] **Frontend: no `eslint-plugin-react-hooks`** — useEffect dep-array
+      mistakes don't warn. Enable `next/core-web-vitals` ruleset.
+
+## 🐞 Code-quality audit follow-ups
+
+### High
+
+- [ ] **Connections/Devices error swallowed** — `app/connections/page.tsx`
+      and `app/devices/page.tsx` `.catch(() => {})` hide 401/500 fetch
+      failures. Set an error state and render it like other branches.
+
+### Medium
+
+- [ ] **News refresh is serial** — `news.service.ts:64` for-await across
+      42 integrations. One slow RSS host blocks the whole tick. Use
+      `Promise.allSettled` with a small concurrency limit (`pLimit(6)`).
+- [ ] **News refresh runs for unused integrations** — wasted requests.
+      Only run for games where at least one `TrackedProfile.active=true`
+      exists (or where any LinkedAccount points at the platform).
+- [ ] **Identity-resolve scheduler is serial** —
+      `identity-resolve.scheduler.ts:26` walks 1000 accounts one-by-one.
+      Chunked parallel with bounded concurrency.
+- [ ] **VRChat concurrent 401 → multiple parallel logins** —
+      `vrchat-worlds.integration.ts:128-134` + `vrchat-auth.service.ts:43`.
+      Serialise via an in-flight login Promise singleton.
+- [ ] **CoC tag regex is case-insensitive** — `clash-of-clans.integration.ts:100`.
+      Drop the `i` flag (or uppercase first) so `quy` doesn't route to
+      tag lookup and 404.
+- [ ] **Roblox `Promise.all` tanks on transient 5xx of user lookup** —
+      `roblox.integration.ts:63-71`. Wrap user lookup in `.catch` or use
+      `Promise.allSettled`.
+- [ ] **`games.service.ts:64` swallows all resolveIdentity errors** —
+      including transient ones. Rethrow non-404 IntegrationHttpErrors, or
+      at least log them.
+- [ ] **`news.scheduler.ts` `onModuleInit` setTimeout** not cleared in
+      `onModuleDestroy` — fast restart can fire against a closed Prisma.
+- [ ] **`safeRatio(a, 0)` returns `a`** — `hypixel:109`, `wynncraft:118`,
+      `wargaming.base:125`. Player with kills and zero deaths shows K/D
+      == raw kill count. Return `a` only when both are 0.
+- [ ] **OSRS/RS3 trailing CR** — `osrs.integration.ts:68`,
+      `runescape.integration.ts:61`. `'-1,-1,-1\r'.split(',').map(Number)`
+      → NaN → stored as null silently. `.trim()` each line.
+
+### Low
+
+- [ ] **`devices.service.ts:45` lastSeen update silently swallowed** —
+      `.catch(() => {})`. At least `.catch(e => log.warn(...))`.
+- [ ] **42-arg `IntegrationsModule` constructor** is fragile copy-paste.
+      Use `ModuleRef` + iterate the array.
+- [ ] **`logout()` in `auth.tsx` swallows server failure** — user thinks
+      refresh tokens revoked when they weren't. Surface a warning.
+- [ ] **Frontend `tsconfig.tsbuildinfo` not gitignored or cleaned** —
+      `next build` doesn't drop it. Add to `.gitignore` and to a `prebuild`
+      script.
+
+### Nit
+
+- [ ] **Stray `(TODO)` doc comment** in
+      `warframe.integration.ts:18`.
+
+---
+
 ## 🔥 Live blockers (fix next)
 
 - [ ] Crafatar 521 from `/_next/image` — switch Minecraft avatars to a more
@@ -211,17 +303,33 @@ The request goes into a queue an admin approves or rejects.
 
 ## ✅ Done (recent)
 
+- 🛡 **Critical: ingest can't hijack other users' TrackedProfiles** — the
+  upsert now refuses cross-user reassignment and rejects with
+  `PROFILE_OWNED_BY_OTHER_USER` (409-ish).
+- 🛡 **Critical: empty `Device.scopes` no longer means "all games"** —
+  inverted to deny-by-default; use `['*']` for all-access.
+- 🛡 **High: JWT_SECRET fall-back to dev string in prod now throws at
+  boot** — both `auth.module.ts` and `jwt.strategy.ts` use a shared
+  `resolveJwtSecret()` that refuses to start with the dev default in
+  production.
+- 🛡 **High: bootstrap admin requires `BOOTSTRAP_ADMIN_ENABLED=true` in
+  prod**, and refuses to use the dev-default password in prod. Plaintext
+  password no longer logged.
+- 🛡 **High: `prisma db seed` no longer logs the seeded password**.
+- 🐞 **High: `ingestOnly` games skipped by RefreshScheduler** — stops the
+  stub `getProfile` from overwriting device-ingested snapshots every
+  minute. Scheduler also paginates instead of capping at 500.
 - Single-domain nginx setup (`/api/*` → backend, `/socket.io/*` → backend, `/` → frontend).
 - `INTERNAL_API_URL` for SSR fetches (fixes `/profile/<username>` 404).
 - Prisma initial migration committed.
-- Bootstrap admin auto-created on first boot.
+- Bootstrap admin auto-created on first boot (now gated, see above).
 - Backend port pinned at 4000 in the container regardless of `.env`.
-- Background admin password rotation reminder in boot log.
 - Wynncraft v3: dropped `fullResult` (their API rejects values now).
-- Hypixel + Wynncraft full-body MC skin avatars.
+- Hypixel + Wynncraft full-body MC skin avatars via mc-heads.net.
 - Clash of Clans live integration (player + clan).
 - Beat Saber multi-backend (ScoreSaber + BeatLeader + AccSaber + HitBloq).
 - `Array.isArray()` guards in player-page `useMemo`s.
+- User settings: change username + change password.
 
 ---
 

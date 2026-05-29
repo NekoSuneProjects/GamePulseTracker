@@ -23,12 +23,34 @@ export class IngestService {
     if (!device || device.revokedAt) {
       throw new ForbiddenException({ code: 'DEVICE_REVOKED', message: 'device not active' });
     }
+    // Empty scopes[] now means "no permissions", not "all games" — flipped
+    // because the previous default + the pairing flow's blank scopes meant
+    // ANY paired device could ingest for ANY game. Now devices must be
+    // explicitly granted each game (set scopes=['*'] for all-access).
     const scopes = (device.scopes as string[]) ?? [];
-    if (scopes.length > 0 && !scopes.includes(payload.game)) {
-      throw new ForbiddenException({ code: 'SCOPE_DENIED', message: `device cannot ingest ${payload.game}` });
+    const allGames = scopes.includes('*');
+    if (!allGames && !scopes.includes(payload.game)) {
+      throw new ForbiddenException({
+        code: 'SCOPE_DENIED',
+        message: `device cannot ingest ${payload.game}. Add ${payload.game} (or '*' for all games) to the device's scopes.`,
+      });
     }
 
     const platform = (payload.platform ?? '_').trim() || '_';
+
+    // Block hijack: a TrackedProfile that already belongs to a DIFFERENT user
+    // must not be re-attributed by another user's device just by POSTing the
+    // same providerId. Read first; if owned by someone else, refuse.
+    const existing = await this.prisma.trackedProfile.findUnique({
+      where: { game_platform_providerId: { game: payload.game, platform, providerId: payload.providerId } },
+      select: { userId: true },
+    });
+    if (existing?.userId && existing.userId !== device.userId) {
+      throw new ForbiddenException({
+        code: 'PROFILE_OWNED_BY_OTHER_USER',
+        message: 'This tracked profile already belongs to another user. Have them unlink it first, or use a different providerId.',
+      });
+    }
 
     const snapshot: NormalizedProfile = {
       game: payload.game,

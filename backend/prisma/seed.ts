@@ -20,7 +20,7 @@ async function main() {
     },
   });
   // eslint-disable-next-line no-console
-  console.log(`Seeded admin: ${admin.email} (password: ${adminPassword})`);
+  console.log(`Seeded admin: ${admin.email} (password from SEED_ADMIN_PASSWORD env or documented default — NOT logged here for safety)`);
 
   const demoHash = await argon2.hash('DemoPass!2026');
   const demo = await prisma.user.upsert({

@@ -55,26 +55,39 @@ async function bootstrap() {
 }
 
 /**
- * Create a bootstrap admin user IF the users table is empty. This makes
- * `docker compose up` work end-to-end without a separate seed command —
- * the operator can log straight in. Skipped on every subsequent boot.
+ * Create a bootstrap admin user IF the users table is empty.
  *
- * Credentials come from env (BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD)
- * and fall back to a known default that we log loudly so it's impossible
- * to miss in production logs. If you don't want auto-seed at all, set
- * BOOTSTRAP_ADMIN_DISABLED=true.
+ * GUARDS:
+ *  - In production (NODE_ENV=production), refuses to auto-seed unless the
+ *    operator opts in by setting BOOTSTRAP_ADMIN_ENABLED=true. Otherwise
+ *    an attacker who can wipe the users table (e.g. via a leaked DB
+ *    credential) can re-trigger the seed and pick up the default password.
+ *  - In production, refuses to use the dev-default password. The operator
+ *    must set BOOTSTRAP_ADMIN_PASSWORD explicitly.
+ *  - Plaintext password is NEVER logged. The operator already knows it
+ *    because they set the env var (or they ran in dev and can read the
+ *    .env).
  */
 async function ensureBootstrapAdmin(prisma: PrismaService, log: Logger) {
   if (process.env.BOOTSTRAP_ADMIN_DISABLED === 'true') return;
+
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd && process.env.BOOTSTRAP_ADMIN_ENABLED !== 'true') return;
+
   try {
     const count = await prisma.user.count();
     if (count > 0) return;
 
-    const email = process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@gamepulse.local';
-    const password = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'ChangeMe!2026';
+    const email    = process.env.BOOTSTRAP_ADMIN_EMAIL    ?? 'admin@gamepulse.local';
     const username = process.env.BOOTSTRAP_ADMIN_USERNAME ?? 'admin';
-    const passwordHash = await argon2.hash(password);
+    const password = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? (isProd ? '' : 'ChangeMe!2026');
 
+    if (isProd && !password) {
+      log.error('BOOTSTRAP_ADMIN_ENABLED=true but no BOOTSTRAP_ADMIN_PASSWORD set. Refusing to create admin.');
+      return;
+    }
+
+    const passwordHash = await argon2.hash(password);
     await prisma.user.create({
       data: {
         email: email.toLowerCase(),
@@ -86,10 +99,11 @@ async function ensureBootstrapAdmin(prisma: PrismaService, log: Logger) {
     });
 
     log.warn('================================================================');
-    log.warn(' Bootstrap admin created — change the password immediately.');
+    log.warn(' Bootstrap admin created.');
     log.warn(`   email:    ${email}`);
     log.warn(`   username: ${username}`);
-    log.warn(`   password: ${password}`);
+    log.warn(' Password is the value of BOOTSTRAP_ADMIN_PASSWORD (or, in dev,');
+    log.warn(' the documented default). Change it via /settings → Password.');
     log.warn(' Set BOOTSTRAP_ADMIN_DISABLED=true to skip this on next boot.');
     log.warn('================================================================');
   } catch (e) {
