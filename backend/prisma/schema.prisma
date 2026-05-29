@@ -33,13 +33,15 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions          Session[]
-  linkedAccounts    LinkedAccount[]
-  trackedProfiles   TrackedProfile[]
-  notifications     Notification[]
-  passwordResets    PasswordReset[]
-  apiKeys           ApiKey[]
-  devices           Device[]
+  sessions             Session[]
+  linkedAccounts       LinkedAccount[]
+  trackedProfiles      TrackedProfile[]
+  notifications        Notification[]
+  passwordResets       PasswordReset[]
+  apiKeys              ApiKey[]
+  devices              Device[]
+  deletionRequests     StatsDeletionRequest[] @relation("DeletionRequester")
+  deletionsResolved    StatsDeletionRequest[] @relation("DeletionResolver")
 
   @@index([role])
 }
@@ -153,6 +155,7 @@ model TrackedProfile {
   matches   MatchRecord[]
   seasons   SeasonRecord[]
   snapshots StatSnapshot[]
+  deletionRequests StatsDeletionRequest[]
 
   @@unique([game, platform, providerId])
   @@index([userId])
@@ -284,6 +287,41 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+// ----------------------------------------------------------------------------
+// Stats deletion requests (user → admin approval queue)
+//
+// A user with verified ownership of a TrackedProfile (either it's userId
+// matches them, or they hold a LinkedAccount that resolves to the same
+// (platform, providerId)) can request the full erasure of that profile's
+// stats. An admin approves, which cascade-deletes the TrackedProfile and
+// every StatSnapshot/MatchRecord/SeasonRecord descended from it.
+// ----------------------------------------------------------------------------
+enum DeletionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model StatsDeletionRequest {
+  id          String         @id @default(cuid())
+  userId      String
+  profileId   String
+  reason      String?
+  status      DeletionStatus @default(PENDING)
+  adminId     String?
+  adminNote   String?
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  user    User           @relation("DeletionRequester", fields: [userId], references: [id], onDelete: Cascade)
+  admin   User?          @relation("DeletionResolver",  fields: [adminId], references: [id], onDelete: SetNull)
+  profile TrackedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@index([profileId])
 }
 
 // ----------------------------------------------------------------------------

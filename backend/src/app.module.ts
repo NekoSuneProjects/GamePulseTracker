@@ -22,6 +22,7 @@ import { PublicApiModule } from './public-api/public-api.module';
 import { IntegrationsModule } from './games/integrations/integrations.module';
 import { NewsModule } from './news/news.module';
 import { IngestModule } from './ingest/ingest.module';
+import { DeletionRequestsModule } from './deletion-requests/deletion-requests.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { IngestModule } from './ingest/ingest.module';
     PublicApiModule,
     NewsModule,
     IngestModule,
+    DeletionRequestsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

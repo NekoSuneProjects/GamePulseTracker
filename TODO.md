@@ -140,22 +140,25 @@ colors, fonts, and stat layouts.
 
 ## 🗑 Stats deletion requests (user → admin approval)
 
-Users can request deletion of any TrackedProfile that belongs to them.
-The request goes into a queue an admin approves or rejects.
-
-- [ ] Prisma model `StatsDeletionRequest`: id, userId, profileId, reason?,
-      status (pending|approved|rejected), adminId?, resolvedAt?, createdAt.
-- [ ] Backend: `POST /games/:game/player/:providerId/delete-request`
-      (auth required; must own the linked account that resolved to this
-      profile, OR be the user the profile is attached to).
-- [ ] Backend: `GET /admin/deletion-requests?status=pending`.
-- [ ] Backend: `POST /admin/deletion-requests/:id/approve` (cascade-deletes
-      TrackedProfile + StatSnapshot + MatchRecord + SeasonRecord rows).
-- [ ] Backend: `POST /admin/deletion-requests/:id/reject` (with reason).
-- [ ] Frontend: "Request stats deletion" button on the player profile page,
-      visible only when the logged-in user owns the profile.
-- [ ] Frontend: Admin → Deletion Requests section with list + accept/reject.
-- [ ] Notification to the requester when an admin acts.
+- [x] Prisma model `StatsDeletionRequest` + `DeletionStatus` enum +
+      migration `20260529000000_add_stats_deletion_requests`.
+- [x] Backend: `POST /deletion-requests` (auth) creates a request after
+      verifying ownership — either profile.userId matches OR the user
+      holds a LinkedAccount with the same providerId.
+- [x] Backend: `GET /deletion-requests/mine` — user's own queue.
+- [x] Backend: `GET /admin/deletion-requests?status=pending|approved|rejected`.
+- [x] Backend: `POST /admin/deletion-requests/:id/approve` cascades the
+      TrackedProfile delete (snapshots/matches/seasons cascade via FK).
+- [x] Backend: `POST /admin/deletion-requests/:id/reject` (with optional
+      adminNote shown to user).
+- [x] Frontend: `DeletionRequestButton` on the player profile page,
+      shown to any logged-in user; backend rejects with 403 if they don't
+      own it.
+- [x] Frontend: `/admin/deletion-requests` page with status filter +
+      approve/reject inline. Linked from the admin overview.
+- [x] Notification to the requester via the existing Notifications
+      pipeline on both approve and reject (best-effort, won't fail the
+      action if the push errors).
 
 ## 🆕 New game integrations
 

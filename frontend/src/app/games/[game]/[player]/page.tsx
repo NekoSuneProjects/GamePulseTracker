@@ -9,6 +9,7 @@ import { PlayerCard } from '@/components/PlayerCard';
 import { StatCard, CountUp } from '@/components/StatCard';
 import { LiveChart } from '@/components/LiveChart';
 import { MatchHistory } from '@/components/MatchHistory';
+import { DeletionRequestButton } from '@/components/DeletionRequestButton';
 import type { NormalizedProfile, NormalizedMatch } from '@gpt/shared';
 
 interface ProfilePayload {
@@ -113,6 +114,16 @@ export default function PlayerProfilePage({ params }: { params: { game: string; 
             : (Array.isArray(snap.recent) ? snap.recent : [])
         } />
       </section>
+
+      {data?.profile?.id && (
+        <section className="pt-4 border-t border-ink-800/60">
+          <DeletionRequestButton
+            profileId={data.profile.id}
+            game={params.game}
+            displayName={snap.displayName ?? decoded}
+          />
+        </section>
+      )}
     </div>
   );
 }

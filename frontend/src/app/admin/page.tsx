@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { StatCard } from '@/components/StatCard';
@@ -32,7 +33,12 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-display font-semibold">Admin</h1>
+      <header className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-3xl font-display font-semibold">Admin</h1>
+        <Link href="/admin/deletion-requests" className="chip hover:bg-pulse-500/30">
+          Deletion requests →
+        </Link>
+      </header>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard accent label="Users" value={data.users} />
