@@ -54,17 +54,22 @@ export class NewsService {
     private integrations: IntegrationRegistry,
   ) {}
 
-  async list(game: string, limit = 12): Promise<NewsItem[]> {
-    const cacheKey = `gpt:news:${game}:${limit}`;
+  async list(game: string, limit = 12, tag?: string): Promise<NewsItem[]> {
+    // Cache key keyed by the tag too so different filters don't clobber each
+    // other. Lookup is unfiltered by tag in postgres-jsonb terms (Prisma
+    // doesn't have a generic JSON-contains we can rely on across PG/Mysql),
+    // so we fetch a larger window and filter in app.
+    const cacheKey = `gpt:news:${game}:${limit}:${tag ?? ''}`;
     const cached = await this.redis.getJson<NewsItem[]>(cacheKey);
     if (cached) return cached;
 
+    const take = tag ? Math.max(limit * 5, 50) : limit;
     const rows = await this.prisma.newsItem.findMany({
       where: { game },
       orderBy: { publishedAt: 'desc' },
-      take: limit,
+      take,
     });
-    const items: NewsItem[] = rows.map(r => ({
+    let items: NewsItem[] = rows.map(r => ({
       id: r.id,
       game: r.game as GameSlug,
       title: r.title,
@@ -75,8 +80,41 @@ export class NewsService {
       tags: (r.tags as string[] | null) ?? [],
       publishedAt: r.publishedAt.toISOString(),
     }));
+    if (tag) {
+      const needle = tag.toLowerCase();
+      items = items.filter(i => i.tags?.some(t => String(t).toLowerCase() === needle)).slice(0, limit);
+    }
     await this.redis.setJson(cacheKey, items, 600);
     return items;
+  }
+
+  /** Distinct tag values for a game, sorted by frequency desc. */
+  async tagsFor(game: string): Promise<Array<{ tag: string; count: number }>> {
+    const cacheKey = `gpt:news:tags:${game}`;
+    const cached = await this.redis.getJson<Array<{ tag: string; count: number }>>(cacheKey);
+    if (cached) return cached;
+    // Pull a window large enough to be representative without scanning the
+    // whole table — most games have well under 500 news rows.
+    const rows = await this.prisma.newsItem.findMany({
+      where: { game },
+      orderBy: { publishedAt: 'desc' },
+      take: 500,
+      select: { tags: true },
+    });
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      const tags = (r.tags as string[] | null) ?? [];
+      for (const t of tags) {
+        if (typeof t !== 'string' || !t.trim()) continue;
+        const key = t.trim().toLowerCase();
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+    const out = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count }));
+    await this.redis.setJson(cacheKey, out, 1800);
+    return out;
   }
 
   /**

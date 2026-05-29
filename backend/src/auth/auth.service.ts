@@ -40,6 +40,37 @@ export class AuthService {
     const ok = await argon2.verify(user.passwordHash, dto.password);
     if (!ok) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
 
+    // Soft-deleted account whose grace window has already elapsed — refuse
+    // even with the correct password. The scheduled hard-delete will sweep
+    // them eventually, but we don't want them to be able to keep using the
+    // account in the meantime.
+    if (user.deletionAt && user.deletionAt <= new Date()) {
+      throw new UnauthorizedException({ code: 'ACCOUNT_DELETED', message: 'This account has been deleted.' });
+    }
+    // Soft-deleted but still inside the grace window — successful sign-in
+    // is the user's "undo" signal. Auto-cancel and continue with login.
+    if (user.deletionRequestedAt && user.deletionAt) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { deletionRequestedAt: null, deletionAt: null },
+      });
+      this.log.log(`User ${user.id} signed back in — deletion request cancelled`);
+    }
+
+    // 2FA gate. Don't reveal whether the username/password matched if 2FA
+    // is enabled — return a distinct code so the UI knows to prompt for
+    // a TOTP, but the message is still "invalid credentials" to an
+    // attacker scraping.
+    if (user.totpEnabled) {
+      if (!dto.totp) {
+        throw new UnauthorizedException({ code: 'TOTP_REQUIRED', message: 'Two-factor code required.' });
+      }
+      const { authenticator } = await import('otplib');
+      if (!user.totpSecret || !authenticator.check(dto.totp.trim(), user.totpSecret)) {
+        throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: 'Invalid credentials' });
+      }
+    }
+
     return this.issueSession(user.id, user.username, user.role, ua, ip);
   }
 
@@ -122,6 +153,8 @@ export class AuthService {
     createdAt: Date; avatarUrl: string|null;
     publicProfile: boolean; bio: string|null;
     socials: unknown;
+    deletionAt?: Date|null;
+    totpEnabled?: boolean;
   }) {
     return {
       id: u.id,
@@ -134,6 +167,8 @@ export class AuthService {
       bio: u.bio,
       socials: (u.socials as Array<{ kind: string; value: string }> | null) ?? [],
       createdAt: u.createdAt.toISOString(),
+      deletionAt: u.deletionAt ? u.deletionAt.toISOString() : null,
+      totpEnabled: u.totpEnabled ?? false,
     };
   }
 }

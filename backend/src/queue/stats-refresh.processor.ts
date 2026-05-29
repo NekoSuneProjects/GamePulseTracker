@@ -6,12 +6,18 @@ import { STATS_REFRESH_QUEUE, StatsRefreshJob } from './queue.service';
 import { GamesService } from '../games/games.service';
 import { EventsGateway } from '../ws/events.gateway';
 import { PrismaService } from '../prisma/prisma.service';
+import { SocialService } from '../social/social.service';
 
 @Processor(STATS_REFRESH_QUEUE)
 export class StatsRefreshProcessor {
   private readonly log = new Logger(StatsRefreshProcessor.name);
 
-  constructor(private games: GamesService, private gateway: EventsGateway, private prisma: PrismaService) {}
+  constructor(
+    private games: GamesService,
+    private gateway: EventsGateway,
+    private prisma: PrismaService,
+    private social: SocialService,
+  ) {}
 
   @Process({ concurrency: Number(process.env.QUEUE_CONCURRENCY ?? 8) })
   async handle(job: Job<StatsRefreshJob>) {
@@ -19,7 +25,7 @@ export class StatsRefreshProcessor {
 
     const prevRow = await this.prisma.trackedProfile.findUnique({
       where: { game_platform_providerId: { game, platform, providerId } },
-      select: { latestSnapshot: true },
+      select: { id: true, userId: true, latestSnapshot: true, displayName: true },
     });
     const prevSnap = prevRow?.latestSnapshot as unknown as NormalizedProfile | undefined;
 
@@ -29,11 +35,38 @@ export class StatsRefreshProcessor {
     const delta = this.diff(prevSnap, snap);
     this.gateway.broadcastStatsUpdate(game, platform, providerId, snap, delta);
 
-    if (prevSnap?.headline?.rank !== snap.headline?.rank) {
-      this.gateway.broadcastRankChange(game, platform, providerId, prevSnap?.headline?.rank, snap.headline?.rank);
+    const prevRank = prevSnap?.headline?.rank;
+    const nextRank = snap.headline?.rank;
+    const prevLevel = prevSnap?.headline?.level ?? 0;
+    const nextLevel = snap.headline?.level ?? 0;
+
+    if (prevRank !== nextRank) {
+      this.gateway.broadcastRankChange(game, platform, providerId, prevRank, nextRank);
     }
-    if ((snap.headline?.level ?? 0) > (prevSnap?.headline?.level ?? 0)) {
-      this.gateway.broadcastLevelUp(game, platform, providerId, prevSnap?.headline?.level, snap.headline.level!);
+    if (nextLevel > prevLevel) {
+      this.gateway.broadcastLevelUp(game, platform, providerId, prevLevel, nextLevel);
+    }
+
+    // Public activity feed — only emit when the TrackedProfile is claimed
+    // by a user. Anonymous-tracked profiles broadcast over WS but don't
+    // generate feed entries (nobody owns the feed).
+    if (prevRow?.userId) {
+      if (nextLevel > prevLevel) {
+        await this.social.appendActivity(
+          prevRow.userId,
+          'level-up',
+          { game, platform, providerId, displayName: prevRow.displayName, from: prevLevel, to: nextLevel } as object,
+          prevRow.id,
+        );
+      }
+      if (prevRank !== nextRank) {
+        await this.social.appendActivity(
+          prevRow.userId,
+          'rank-change',
+          { game, platform, providerId, displayName: prevRow.displayName, from: prevRank ?? null, to: nextRank ?? null } as object,
+          prevRow.id,
+        );
+      }
     }
 
     return { game, platform, providerId, ok: true };

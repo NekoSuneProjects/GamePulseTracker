@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { TotpService } from './totp.service';
 
 const DEV_DEFAULT_SECRET = 'dev-secret-change-me';
 
@@ -35,7 +36,7 @@ export function resolveJwtSecret(): string {
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, TotpService],
   controllers: [AuthController],
   exports: [AuthService],
 })

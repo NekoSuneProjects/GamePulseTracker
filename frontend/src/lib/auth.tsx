@@ -8,7 +8,7 @@ import type { AuthSession, AuthUser } from '@gpt/shared';
 interface AuthContext {
   user: AuthUser | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string, totp?: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -34,10 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  async function login(identifier: string, password: string) {
+  async function login(identifier: string, password: string, totp?: string) {
     const session = await api<AuthSession>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ identifier, password }),
+      body: JSON.stringify({ identifier, password, totp }),
     });
     setTokens(session.accessToken, session.refreshToken);
     setUser(session.user);

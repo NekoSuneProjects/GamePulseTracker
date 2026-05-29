@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { NewsList } from '@/components/NewsList';
+import { NewsTagFilter } from '@/components/NewsTagFilter';
 import { ShopGrid } from '@/components/ShopGrid';
 import { GameHero } from '@/components/GameHero';
 import { GameSubNav } from '@/components/GameSubNav';
@@ -22,14 +23,16 @@ const METRICS: Array<{ label: string; metric: MetricBlock['metric'] }> = [
   { label: 'Top matches', metric: 'matches' },
 ];
 
-export default async function GamePage({ params }: { params: { game: string } }) {
+export default async function GamePage({ params, searchParams }: { params: { game: string }; searchParams?: { tag?: string } }) {
   const wantsShop = SHOP_GAMES.has(params.game);
   const game = getGame(params.game);
   const displayName = game?.name ?? params.game;
+  const tag = searchParams?.tag?.trim();
+  const newsQs = tag ? `?limit=9&tag=${encodeURIComponent(tag)}` : '?limit=9';
 
   const [recentAll, newsRaw, shop, ...metricResults] = await Promise.all([
     serverFetch<RecentRow[]>(`/stats/recent?limit=24`),
-    serverFetch<NewsItem[]>(`/news/${encodeURIComponent(params.game)}?limit=9`),
+    serverFetch<NewsItem[]>(`/news/${encodeURIComponent(params.game)}${newsQs}`),
     wantsShop ? serverFetch<ShopResponse>(`/games/${encodeURIComponent(params.game)}/shop`) : Promise.resolve(null),
     ...METRICS.map(m => serverFetch<LeaderRow[]>(`/leaderboards/${encodeURIComponent(params.game)}?metric=${m.metric}&limit=2`)),
   ]);
@@ -51,7 +54,10 @@ export default async function GamePage({ params }: { params: { game: string } })
       <GameTopStats game={params.game} blocks={blocks} />
 
       <section>
-        <h2 className="text-lg font-display font-semibold mb-3">Latest news</h2>
+        <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
+          <h2 className="text-lg font-display font-semibold">Latest news</h2>
+          <NewsTagFilter game={params.game} />
+        </div>
         <NewsList items={news} />
       </section>
 

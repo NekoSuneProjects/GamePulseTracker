@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { IsArray, IsBoolean, IsOptional, IsString, MaxLength, MinLength, Matches } from 'class-validator';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -21,6 +21,10 @@ class ChangePasswordDto {
 
 class ChangeUsernameDto {
   @IsString() @MinLength(3) @MaxLength(32) @Matches(/^[a-zA-Z0-9_.-]+$/) newUsername!: string;
+  @IsString() password!: string;
+}
+
+class DeleteAccountDto {
   @IsString() password!: string;
 }
 
@@ -55,6 +59,22 @@ export class UsersController {
   @ApiBearerAuth()
   async changeUsername(@CurrentUser() user: JwtPayload, @Body() dto: ChangeUsernameDto) {
     const data = await this.users.changeUsername(user.sub, dto.newUsername, dto.password);
+    return { ok: true, data };
+  }
+
+  /** Queue account deletion with a 30-day undo window. */
+  @Delete('me')
+  @ApiBearerAuth()
+  async requestDeletion(@CurrentUser() user: JwtPayload, @Body() dto: DeleteAccountDto) {
+    const data = await this.users.requestAccountDeletion(user.sub, dto.password);
+    return { ok: true, data };
+  }
+
+  /** Cancel a pending deletion request. */
+  @Post('me/delete-cancel')
+  @ApiBearerAuth()
+  async cancelDeletion(@CurrentUser() user: JwtPayload) {
+    const data = await this.users.cancelAccountDeletion(user.sub);
     return { ok: true, data };
   }
 }

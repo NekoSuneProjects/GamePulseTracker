@@ -13,12 +13,15 @@ import { ReactNode } from 'react';
  * Premium routes intentionally omitted — OSS project, no paywalls.
  */
 const NAV = [
-  { href: '/settings',           label: 'Profile' },
-  { href: '/settings/linked',    label: 'Linked accounts' },
-  { href: '/connections',        label: 'Connections (legacy)' },
-  { href: '/settings/username',  label: 'Change username' },
-  { href: '/settings/password',  label: 'Change password' },
-  { href: '/devices',            label: 'Devices' },
+  { href: '/settings',                label: 'Profile' },
+  { href: '/settings/linked',         label: 'Linked accounts' },
+  { href: '/connections',             label: 'Connections (legacy)' },
+  { href: '/settings/username',       label: 'Change username' },
+  { href: '/settings/password',       label: 'Change password' },
+  { href: '/settings/security',       label: 'Two-factor auth' },
+  { href: '/settings/api-keys',       label: 'API keys' },
+  { href: '/devices',                 label: 'Devices' },
+  { href: '/settings/delete-account', label: 'Delete account' },
 ] as const;
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {

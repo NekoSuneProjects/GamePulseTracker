@@ -30,6 +30,19 @@ model User {
   bio           String?
   /// SocialLink[] from @gpt/shared (twitter/twitch/youtube/...).
   socials       Json     @default("[]")
+
+  /// Set when the user requests account deletion. Login is blocked, account
+  /// is invisible to others, and a scheduled job hard-deletes once the grace
+  /// window passes. Users can cancel by signing in again before that.
+  deletionRequestedAt DateTime?
+  /// Scheduled hard-delete timestamp (deletionRequestedAt + 30d, by default).
+  deletionAt          DateTime?
+
+  /// TOTP secret (base32) once the user enrols. Null when 2FA is off.
+  totpSecret    String?
+  /// Set when the user has successfully verified one TOTP code after enrol.
+  totpEnabled   Boolean   @default(false)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -43,8 +56,13 @@ model User {
   deletionRequests     StatsDeletionRequest[] @relation("DeletionRequester")
   deletionsResolved    StatsDeletionRequest[] @relation("DeletionResolver")
   favorites            Favorite[]
+  follows              Follow[] @relation("Follower")
+  followers            Follow[] @relation("Followed")
+  activityEvents       ActivityEvent[]
+  achievements         UserAchievement[]
 
   @@index([role])
+  @@index([deletionAt])
 }
 
 model Session {
@@ -340,6 +358,59 @@ model StatsDeletionRequest {
   @@index([status, createdAt])
   @@index([userId])
   @@index([profileId])
+}
+
+// ----------------------------------------------------------------------------
+// Social — follow + activity feed + achievements
+// ----------------------------------------------------------------------------
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followedId  String
+  createdAt   DateTime @default(now())
+
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed User @relation("Followed", fields: [followedId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followedId])
+  @@index([followerId])
+  @@index([followedId])
+}
+
+/// Public activity feed entries — emitted by the stats refresh processor
+/// when a tracked profile owned by a user crosses a threshold (level-up,
+/// rank change). The feed page reads these as a chronological list per user.
+/// `payload` is a JSON object specific to the `kind` (e.g.
+/// `{ from: 'Gold', to: 'Platinum' }` for rank-change).
+model ActivityEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  /// Optional — which TrackedProfile triggered the event.
+  profileId   String?
+  /// One of: level-up | rank-change | follow | achievement
+  kind        String
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+/// Per-user-achievement unlock log. The set of achievements is hardcoded in
+/// the backend (see achievements/criteria.ts) so we don't need to model the
+/// catalog in Prisma. `slug` is the canonical id; one row per (user, slug).
+model UserAchievement {
+  id        String   @id @default(cuid())
+  userId    String
+  slug      String
+  unlockedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@index([userId])
 }
 
 // ----------------------------------------------------------------------------

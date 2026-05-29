@@ -212,28 +212,57 @@ colors, fonts, and stat layouts.
 
 ## 🛡 Auth + security
 
-- [ ] Delete account (soft-delete + 30-day undo).
-- [ ] Email verification flow (table already exists, SMTP not wired).
-- [ ] Password reset via email link.
-- [ ] 2FA (TOTP) on user accounts.
-- [ ] API key management UI for power users (table exists in Prisma).
+- [x] Delete account (soft-delete + 30-day undo) — `DELETE /users/me`
+      with password confirmation queues `deletionAt = now + 30d`,
+      revokes all sessions, blocks login after the grace window. Signing
+      back in inside the window auto-cancels. Hourly cron sweep hard-
+      deletes (FK cascade handles owned rows). UI page at
+      `/settings/delete-account`.
+- [ ] Email verification flow (table already exists, SMTP not wired —
+      blocked on operator).
+- [ ] Password reset via email link (blocked on SMTP).
+- [x] 2FA (TOTP) on user accounts — `TotpService` (enrol/verify/disable)
+      using otplib. Login enforces a `totp` field on the LoginDto when
+      `totpEnabled`; UI prompts inline at `/login` after the
+      `TOTP_REQUIRED` 401. Settings page at `/settings/security` with
+      QR via api.qrserver.com.
+- [x] API key management UI — `ApiKeysModule` with list/create/revoke,
+      plaintext returned exactly once on create. UI at
+      `/settings/api-keys` with copy-to-clipboard.
 
 ## 🧑‍🤝‍🧑 Social / community
 
 - [x] Favorites — `Favorite` Prisma model + `/favorites` CRUD endpoints,
       star toggle on player profile page, dedicated `/favorites` list
-      page. (The "alongside Recent Players in the search drawer" follow-up
-      depends on the drawer redesign and will land with the UI redesign.)
-- [ ] Public profile feed (level-ups, rank changes) per linked account.
-- [ ] Follow another GamePulseTracker user.
-- [ ] Achievements / badges (verified, 100k matches tracked, etc.).
+      page. Surfaced in the hub side panel for logged-in users.
+- [x] Public profile feed — `ActivityEvent` model + capture in
+      `StatsRefreshProcessor` for level-ups and rank-changes (only when
+      the TrackedProfile is claimed by a user). `GET /users/:username/
+      feed` returns the chronological list; rendered on the user profile
+      page right-hand column.
+- [x] Follow another GamePulseTracker user — `Follow` model + `POST
+      /social/follow` + `DELETE /social/follow/:username` + follower /
+      following list endpoints. `FollowButton` component on the profile
+      page (hidden for self / anon). Follower count surfaced in the
+      profile header.
+- [x] Achievements / badges — hardcoded catalog in
+      `social/achievements.catalog.ts` (verified-email, two-factor,
+      first-link, public-profile, first-tracked, matches-100,
+      matches-100k, followed-10). `SocialService.recomputeAchievements`
+      re-evaluates and inserts new unlocks idempotently. Surfaced on
+      the user profile page as an emoji-badge grid; unlocks also push
+      an ActivityEvent into the feed.
 
 ## 📰 News + content
 
 - [x] News deduplication: in-pass dedup by SHA1(normalised title + URL)
       so the same article from multiple feeds for a single game refresh
       no longer gets upserted twice.
-- [ ] Per-game news filtering by tag (patch, esports, cosmetic).
+- [x] Per-game news filtering by tag — `GET /news/:game?tag=<value>`
+      filters by lowercase tag match; `GET /news/:game/tags` returns
+      distinct tags + counts to populate the dropdown.
+      `NewsTagFilter` component on the per-game page pushes the chosen
+      tag into the URL so the server component re-runs.
 - [ ] Battle pass / season banner on game hubs.
 
 ## 🖥 Dev experience
@@ -243,7 +272,10 @@ colors, fonts, and stat layouts.
       mismatch a deploy earlier than the docker workflow did.
 - [ ] CI: e2e smoke test with Playwright (login → search → profile).
 - [ ] Storybook for components.
-- [ ] Reproducible Postgres seed for demo deployments.
+- [x] Reproducible Postgres seed for demo deployments — `prisma/seed.ts`
+      now seeds 7 users (admin + demo + alice/bob/carol/dave/eve/frank),
+      a small follow graph, and a handful of tracked profiles. Set
+      `SEED_DEMO_DATA=off` to limit to admin only.
 
 ## 📦 Deployment
 

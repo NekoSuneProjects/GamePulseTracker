@@ -113,4 +113,53 @@ export class UsersService {
     });
     return updated;
   }
+
+  /**
+   * Soft-delete account. Marks `deletionRequestedAt` + `deletionAt` 30 days
+   * from now, revokes all sessions, and stops the user being able to log in
+   * via the existing AuthService check. Signing in again before deletionAt
+   * cancels the request.
+   *
+   * Password confirmation required so a stolen JWT alone can't queue a
+   * delete.
+   */
+  async requestAccountDeletion(userId: string, password: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const ok = await argon2.verify(user.passwordHash, password);
+    if (!ok) {
+      throw new UnauthorizedException({ code: 'INVALID_PASSWORD', message: 'Password is incorrect' });
+    }
+    const now = new Date();
+    const deletionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { deletionRequestedAt: now, deletionAt },
+      }),
+      this.prisma.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+      this.prisma.auditLog.create({
+        data: { actorId: userId, action: 'user.delete-request', target: userId, meta: { deletionAt: deletionAt.toISOString() } as object },
+      }),
+    ]);
+    return { deletionAt };
+  }
+
+  /**
+   * Cancel a pending deletion. Called automatically on a successful sign-in
+   * within the grace window — see AuthService.login. Also exposed as a
+   * standalone endpoint for the explicit "Cancel deletion" button.
+   */
+  async cancelAccountDeletion(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { deletionRequestedAt: null, deletionAt: null },
+    });
+    await this.prisma.auditLog.create({
+      data: { actorId: userId, action: 'user.delete-cancel', target: userId, meta: {} as object },
+    });
+    return { cancelled: true };
+  }
 }

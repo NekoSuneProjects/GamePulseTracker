@@ -35,6 +35,10 @@ export interface AuthUser {
   bio?: string | null;
   socials?: SocialLink[];
   createdAt: string;
+  /** Set if account deletion has been queued — UI can show a "queued" banner. */
+  deletionAt?: string | null;
+  /** True if the user has 2FA TOTP fully enrolled (secret saved + verified). */
+  totpEnabled?: boolean;
 }
 
 export interface AuthSession {

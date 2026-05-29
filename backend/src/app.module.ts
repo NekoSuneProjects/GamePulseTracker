@@ -24,6 +24,8 @@ import { NewsModule } from './news/news.module';
 import { IngestModule } from './ingest/ingest.module';
 import { DeletionRequestsModule } from './deletion-requests/deletion-requests.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { SocialModule } from './social/social.module';
 
 @Module({
   imports: [
@@ -58,6 +60,8 @@ import { FavoritesModule } from './favorites/favorites.module';
     IngestModule,
     DeletionRequestsModule,
     FavoritesModule,
+    ApiKeysModule,
+    SocialModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
