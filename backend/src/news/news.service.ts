@@ -56,37 +56,67 @@ export class NewsService {
     return items;
   }
 
-  /** Refresh news for ALL games. Called by NewsScheduler every 30 min. */
+  /**
+   * Refresh news for ALL games. Called by NewsScheduler every 30 min.
+   *
+   * Two optimisations vs. the previous serial loop:
+   *  1. Only refresh integrations that anyone cares about (at least one
+   *     active TrackedProfile for this game). Avoids hammering Wynncraft +
+   *     OSRS + Roblox RSS feeds when nobody has tracked them yet.
+   *  2. Bounded-concurrency parallelism (6 at a time) so one slow feed host
+   *     doesn't block the whole tick. Was a real problem when a single host
+   *     hung past the next cron firing.
+   */
   async refreshAll() {
-    const integrations = this.integrations.list();
-    let upserted = 0;
+    const allIntegrations = this.integrations.list();
 
-    for (const integ of integrations) {
-      try {
-        let items: NewsItem[] = [];
-        if (integ.getNews) {
-          items = await integ.getNews();
-        } else {
-          const fb = FALLBACK_FEEDS.find(f => f.slug === integ.slug);
-          if (fb) items = await parseRssFeed(fb.url, fb.slug, fb.source);
-        }
-
-        for (const item of items.slice(0, 20)) {
-          await this.prisma.newsItem.upsert({
-            where: { game_url: { game: integ.slug, url: item.url } },
-            update: { title: item.title, summary: item.summary, imageUrl: item.imageUrl, publishedAt: new Date(item.publishedAt), source: item.source, tags: item.tags ?? [] },
-            create: {
-              id: item.id, game: integ.slug, title: item.title, url: item.url,
-              source: item.source, summary: item.summary, imageUrl: item.imageUrl,
-              tags: item.tags ?? [], publishedAt: new Date(item.publishedAt),
-            },
-          }).then(() => { upserted++; }).catch(e => this.log.warn(`news upsert failed for ${integ.slug}: ${(e as Error).message}`));
-        }
-        await this.redis.del(`gpt:news:${integ.slug}:12`);
-      } catch (e) {
-        this.log.warn(`news refresh ${integ.slug} failed: ${(e as Error).message}`);
-      }
+    // Skip games where nothing is tracked.
+    const usedSlugs = new Set(
+      (await this.prisma.trackedProfile.findMany({
+        where: { active: true },
+        select: { game: true },
+        distinct: ['game'],
+      })).map(r => r.game),
+    );
+    const integrations = allIntegrations.filter(i => usedSlugs.has(i.slug));
+    if (integrations.length === 0) {
+      this.log.verbose?.('news refresh: no tracked games — skipping');
+      return;
     }
-    if (upserted > 0) this.log.log(`Refreshed news: ${upserted} item(s) across ${integrations.length} game(s)`);
+
+    let upserted = 0;
+    const CONCURRENCY = 6;
+
+    // Process the integrations in parallel batches.
+    for (let i = 0; i < integrations.length; i += CONCURRENCY) {
+      const batch = integrations.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(batch.map(async (integ) => {
+        try {
+          let items: NewsItem[] = [];
+          if (integ.getNews) {
+            items = await integ.getNews();
+          } else {
+            const fb = FALLBACK_FEEDS.find(f => f.slug === integ.slug);
+            if (fb) items = await parseRssFeed(fb.url, fb.slug, fb.source);
+          }
+
+          for (const item of items.slice(0, 20)) {
+            await this.prisma.newsItem.upsert({
+              where: { game_url: { game: integ.slug, url: item.url } },
+              update: { title: item.title, summary: item.summary, imageUrl: item.imageUrl, publishedAt: new Date(item.publishedAt), source: item.source, tags: item.tags ?? [] },
+              create: {
+                id: item.id, game: integ.slug, title: item.title, url: item.url,
+                source: item.source, summary: item.summary, imageUrl: item.imageUrl,
+                tags: item.tags ?? [], publishedAt: new Date(item.publishedAt),
+              },
+            }).then(() => { upserted++; }).catch(e => this.log.warn(`news upsert failed for ${integ.slug}: ${(e as Error).message}`));
+          }
+          await this.redis.del(`gpt:news:${integ.slug}:12`);
+        } catch (e) {
+          this.log.warn(`news refresh ${integ.slug} failed: ${(e as Error).message}`);
+        }
+      }));
+    }
+    if (upserted > 0) this.log.log(`Refreshed news: ${upserted} item(s) across ${integrations.length} active game(s)`);
   }
 }

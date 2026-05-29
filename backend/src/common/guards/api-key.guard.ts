@@ -1,13 +1,30 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * Guard for the public /api/* surface.
+ *
+ * - When `PUBLIC_API_ENABLED=false` (the default), this guard rejects ALL
+ *   requests with 403. Previously it returned `true` here, which meant the
+ *   flag "disabled" the auth but kept the routes open via the throttler —
+ *   confusing and almost-certainly the opposite of what the operator wanted.
+ *
+ * - When enabled, an `X-API-Key` header is OPTIONAL: anonymous callers hit
+ *   the shared per-IP throttle bucket; authenticated callers get the higher
+ *   per-key rate limit attached to their ApiKey row.
+ */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   constructor(private prisma: PrismaService) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    if (process.env.PUBLIC_API_ENABLED !== 'true') return true;
+    if (process.env.PUBLIC_API_ENABLED !== 'true') {
+      throw new ForbiddenException({
+        code: 'PUBLIC_API_DISABLED',
+        message: 'The public API is not enabled on this deployment.',
+      });
+    }
 
     const req = ctx.switchToHttp().getRequest();
     const header = req.headers['x-api-key'] as string | undefined;

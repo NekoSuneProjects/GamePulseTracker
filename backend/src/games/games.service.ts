@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { GAME_CATALOG, getGame } from '@gpt/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -7,6 +7,7 @@ import { DEFAULT_TTL, normalisePlatform } from './integrations/integration.inter
 
 @Injectable()
 export class GamesService {
+  private readonly log = new Logger(GamesService.name);
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
@@ -61,7 +62,16 @@ export class GamesService {
             where: { game_platform_providerId: { game, platform: resolvedPlatform, providerId: resolvedProviderId } },
           });
         }
-      } catch { /* fall through with input values */ }
+      } catch (e) {
+        // Don't fail the whole lookup if the resolver errored — many integrations
+        // legitimately throw "not found" for invalid usernames. But log
+        // non-404-ish errors so we don't silently degrade to a wrong-platform
+        // key when (say) Mojang's API is having an outage.
+        const msg = (e as Error).message ?? String(e);
+        if (!/not found|404/i.test(msg)) {
+          this.log.warn(`resolveIdentity(${game}, ${identifier}) failed: ${msg}`);
+        }
+      }
     }
 
     const canonicalKey = { game, platform: resolvedPlatform, providerId: resolvedProviderId };

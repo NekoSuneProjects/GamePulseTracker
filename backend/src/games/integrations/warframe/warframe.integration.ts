@@ -15,7 +15,7 @@ import { parseRssFeed } from '../rss.helper';
  *     - api.warframe.market/v1/profile/<name>             current open orders
  *     - api.warframe.market/v1/profile/<name>/statistics  90-day trade volume
  *     - api.warframe.market/v1/profile/<name>/reviews/1   review count
- *     - api.warframe.market/v1/auctions/search?type=riven riven listings (TODO)
+ *     - api.warframe.market/v1/auctions/search?type=riven riven listings
  *
  *  3. PRIVATE in-game state (mastery rank, credits, endo, syndicate REP — Suda
  *     et al., aya, focus, sortie streak, riven slot count, etc.) — not exposed

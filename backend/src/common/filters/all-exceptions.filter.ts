@@ -16,6 +16,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let details: unknown;
 
     if (exception instanceof HttpException) {
+      // HttpException messages are explicitly thrown by our code — safe to
+      // surface verbatim because we control them.
       const r = exception.getResponse();
       if (typeof r === 'string') {
         message = r;
@@ -25,14 +27,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code = (obj['code'] as string) ?? code;
         details = obj['details'];
       }
-    } else if (exception instanceof Error) {
-      message = exception.message;
     } else {
-      message = 'Unexpected error';
+      // Any other thrown value is something internal we didn't explicitly
+      // surface — Prisma errors, undici errors, etc. They can include SQL
+      // constraint names, file paths, or DB column lists. Log the full
+      // detail server-side, send a generic message to the client.
+      message = 'Internal server error. Check server logs for details.';
     }
 
     if (status >= 500) {
-      this.log.error(`${req.method} ${req.url} -> ${status}: ${message}`, exception instanceof Error ? exception.stack : undefined);
+      const internalMessage = exception instanceof Error ? exception.message : String(exception);
+      this.log.error(`${req.method} ${req.url} -> ${status}: ${internalMessage}`, exception instanceof Error ? exception.stack : undefined);
     }
 
     res.status(status).json({

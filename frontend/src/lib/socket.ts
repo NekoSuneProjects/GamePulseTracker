@@ -23,6 +23,18 @@ export function getSocket(): Socket {
   return singleton;
 }
 
+/**
+ * Tear the singleton down — call this on logout so the previous user's
+ * subscriptions / auth context don't bleed into the next session.
+ */
+export function disconnectSocket() {
+  if (singleton) {
+    singleton.removeAllListeners();
+    singleton.disconnect();
+    singleton = null;
+  }
+}
+
 export function useLiveProfile(
   game: string | undefined,
   platform: string | undefined,

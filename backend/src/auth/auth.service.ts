@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'crypto';
@@ -8,6 +8,7 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly log = new Logger(AuthService.name);
   constructor(private prisma: PrismaService, private jwt: JwtService) {}
 
   async register(dto: RegisterDto) {
@@ -44,13 +45,36 @@ export class AuthService {
 
   async refresh(refreshToken: string) {
     const tokenHash = this.hash(refreshToken);
+
+    // First check: is this hash present in ANY session at all (including
+    // already-revoked ones)? If we find a REVOKED session matching the
+    // presented token, that's a refresh-token-reuse attack signal — the
+    // legitimate user already rotated, so someone else is presenting an
+    // old copy. Revoke the entire family.
+    const any = await this.prisma.session.findFirst({
+      where: { refreshHash: tokenHash },
+      select: { id: true, userId: true, revokedAt: true, expiresAt: true },
+    });
+    if (!any) {
+      throw new UnauthorizedException({ code: 'INVALID_REFRESH', message: 'Refresh token invalid' });
+    }
+    if (any.revokedAt || any.expiresAt <= new Date()) {
+      // Theft signal — burn the whole user's session family.
+      this.log.warn(`Refresh token reuse detected for user ${any.userId} — revoking all sessions`);
+      await this.prisma.session.updateMany({
+        where: { userId: any.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException({ code: 'INVALID_REFRESH', message: 'Refresh token invalid' });
+    }
+
+    // Legitimate rotation.
     const session = await this.prisma.session.findFirst({
-      where: { refreshHash: tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
+      where: { id: any.id },
       include: { user: true },
     });
     if (!session) throw new UnauthorizedException({ code: 'INVALID_REFRESH', message: 'Refresh token invalid' });
 
-    // Rotate
     await this.prisma.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
     return this.issueSession(session.user.id, session.user.username, session.user.role);
   }

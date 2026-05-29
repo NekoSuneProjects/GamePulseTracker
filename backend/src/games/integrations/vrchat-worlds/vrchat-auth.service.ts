@@ -39,11 +39,22 @@ export class VrchatAuthService {
     return process.env.VRCHAT_USER_AGENT ?? 'GamePulseTracker/0.1 (self-hosted; worlds-only)';
   }
 
+  /**
+   * Shared in-flight login Promise. Without this, multiple concurrent 401s
+   * (e.g. several parallel `/worlds/<id>` requests after the cookie expires)
+   * each call `invalidate()` + `login()` independently, racing N parallel
+   * /auth/user calls against VRChat's rate-limited login endpoint and
+   * potentially temp-banning the operator's account.
+   */
+  private inflightLogin: Promise<string> | null = null;
+
   /** Returns a valid VRChat `Cookie` header value. Logs in if cache is empty. */
   async getCookieHeader(): Promise<string> {
     const cached = await this.redis.client.get(CACHE_KEY);
     if (cached) return cached;
-    return this.login();
+    if (this.inflightLogin) return this.inflightLogin;
+    this.inflightLogin = this.login().finally(() => { this.inflightLogin = null; });
+    return this.inflightLogin;
   }
 
   async invalidate(): Promise<void> {

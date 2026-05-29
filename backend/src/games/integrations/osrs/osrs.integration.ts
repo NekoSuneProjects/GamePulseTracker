@@ -65,7 +65,10 @@ export class OsrsIntegration implements GameIntegration {
     let totalXp = 0;
 
     for (let i = 0; i < SKILL_ORDER.length && i < lines.length; i++) {
-      const [rank, level, xp] = lines[i].split(',').map(Number);
+      // Jagex sometimes appends trailing \r to each CSV line; trim before
+      // split or `Number('...,42\r')` returns NaN and the stored stats
+      // silently become null.
+      const [rank, level, xp] = lines[i].trim().split(',').map(Number);
       const skill = SKILL_ORDER[i];
       skills[skill] = { rank, level, xp };
       if (skill !== 'overall') {

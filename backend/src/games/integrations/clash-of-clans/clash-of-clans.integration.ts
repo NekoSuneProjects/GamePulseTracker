@@ -96,8 +96,12 @@ export class ClashOfClansIntegration implements GameIntegration {
     if (!this.isEnabled() || !q.query.trim()) return [];
     const platform = q.platform === 'clan' ? 'clan' : 'player';
 
-    // Tag-shaped query? Resolve directly.
-    if (/^#?[0289CGJLPQRUVY]+$/i.test(q.query.trim())) {
+    // Tag-shaped query? Resolve directly. (No `i` flag — CoC tags are
+    // restricted to specific uppercase characters; with `i` set, bare
+    // names like "quy" matched the regex and got routed to tag lookup,
+    // returning a misleading 404.)
+    const normalised = q.query.trim().toUpperCase();
+    if (/^#?[0289CGJLPQRUVY]+$/.test(normalised)) {
       try {
         const profile = await this.getProfile({ identifier: q.query, platform });
         return [{ providerId: profile.providerId, displayName: profile.displayName, platform }];
@@ -228,5 +232,8 @@ export class ClashOfClansIntegration implements GameIntegration {
     };
   }
 
-  private safeRatio(a?: number, b?: number) { if (!a) return 0; if (!b) return a; return Number((a / b).toFixed(3)); }
+  private safeRatio(a?: number, b?: number) {
+    if (!a) return 0;
+    return Number((a / Math.max(1, b ?? 0)).toFixed(3));
+  }
 }

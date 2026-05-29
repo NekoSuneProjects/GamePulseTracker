@@ -60,8 +60,12 @@ export class RobloxIntegration implements GameIntegration {
     const resolved = await this.resolveIdentity(q);
     const id = resolved.providerId;
 
+    // Each call gets its own .catch so a single transient 5xx (the user
+    // endpoint was previously bare and any failure tanked the whole profile
+    // even though friends/followers/thumbnail had succeeded).
     const [user, friends, followers, following, thumb] = await Promise.all([
-      httpJson<RbxUser>(`https://users.roblox.com/v1/users/${id}`),
+      httpJson<RbxUser>(`https://users.roblox.com/v1/users/${id}`)
+        .catch(() => ({ id: Number(id), name: id, displayName: id } as RbxUser)),
       httpJson<RbxCount>(`https://friends.roblox.com/v1/users/${id}/friends/count`).catch(() => ({ count: 0 })),
       httpJson<RbxCount>(`https://friends.roblox.com/v1/users/${id}/followers/count`).catch(() => ({ count: 0 })),
       httpJson<RbxCount>(`https://friends.roblox.com/v1/users/${id}/followings/count`).catch(() => ({ count: 0 })),

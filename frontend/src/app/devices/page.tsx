@@ -27,7 +27,7 @@ export default function DevicesPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push('/login'); return; }
-    refresh().catch(() => {});
+    refresh().catch(e => setError(e instanceof ApiError ? e.message : 'Failed to load devices'));
   }, [loading, user, router]);
 
   async function create(e: React.FormEvent) {

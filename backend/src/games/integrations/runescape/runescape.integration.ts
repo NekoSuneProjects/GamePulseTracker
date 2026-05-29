@@ -58,7 +58,9 @@ export class RunescapeIntegration implements GameIntegration {
     const lines = csv.trim().split('\n');
     const skills: Record<string, { rank: number; level: number; xp: number }> = {};
     for (let i = 0; i < RS3_SKILLS.length && i < lines.length; i++) {
-      const [rank, level, xp] = lines[i].split(',').map(Number);
+      // .trim() — Jagex sometimes appends \r to each CSV line which would
+      // make Number(...) return NaN and silently null every stored field.
+      const [rank, level, xp] = lines[i].trim().split(',').map(Number);
       skills[RS3_SKILLS[i]] = { rank, level, xp };
     }
     const overall = skills.overall ?? { rank: -1, level: 0, xp: 0 };

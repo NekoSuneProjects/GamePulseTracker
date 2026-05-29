@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { api, clearTokens, getAccess, setTokens } from './api';
+import { disconnectSocket } from './socket';
 import type { AuthSession, AuthUser } from '@gpt/shared';
 
 interface AuthContext {
@@ -54,8 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     try {
       await api('/auth/logout', { method: 'POST', auth: true, body: JSON.stringify({ refreshToken: localStorage.getItem('gpt:refresh') ?? '' }) });
-    } catch { /* ignore */ }
+    } catch (e) {
+      // The session was probably already revoked or expired — still log it
+      // so we notice if the logout endpoint regresses, but don't block the
+      // local cleanup since the user wants to be signed out anyway.
+      // eslint-disable-next-line no-console
+      console.warn('[GamePulseTracker] /auth/logout failed:', e);
+    }
     clearTokens();
+    disconnectSocket();
     setUser(null);
   }
 

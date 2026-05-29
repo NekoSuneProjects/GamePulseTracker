@@ -106,7 +106,10 @@ export class HypixelIntegration implements GameIntegration {
     return (-3.5 + Math.sqrt(12.25 + 0.0008 * exp));
   }
   private safeRatio(a?: number, b?: number) {
-    if (!a) return 0; if (!b) return a;
-    return Number((a / b).toFixed(3));
+    // 0 in numerator → 0. 0 in denominator with non-zero numerator → divide
+    // by 1 (so a player with N kills and zero deaths shows K/D = N, not
+    // an inflated "100k kills equals 100k K/D"). Both undefined → 0.
+    if (!a) return 0;
+    return Number((a / Math.max(1, b ?? 0)).toFixed(3));
   }
 }

@@ -13,6 +13,12 @@ async function bootstrap() {
   const log = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule, { cors: false });
 
+  // Behind nginx — trust the first proxy hop so req.ip / X-Forwarded-For
+  // reflect the real client instead of the loopback address. Session/audit
+  // rows would otherwise all show 127.0.0.1.
+  const expressApp = app.getHttpAdapter().getInstance() as unknown as { set: (k: string, v: unknown) => void };
+  expressApp.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
+
   const origins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
     .split(',').map(s => s.trim()).filter(Boolean);
 
@@ -37,21 +43,29 @@ async function bootstrap() {
 
   app.setGlobalPrefix('', { exclude: ['health'] });
 
-  const config = new DocumentBuilder()
-    .setTitle('GamePulseTracker API')
-    .setDescription('Multi-game player statistics and tracking platform.')
-    .setVersion('0.1.0')
-    .addBearerAuth()
-    .build();
-  const doc = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, doc);
+  // Swagger UI enumerates every endpoint. We only mount it when explicitly
+  // enabled OR in non-production environments. In prod set SWAGGER_ENABLED=true
+  // to expose it (gate it behind nginx ACL too if it's publicly reachable).
+  const isProd = process.env.NODE_ENV === 'production';
+  const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || !isProd;
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('GamePulseTracker API')
+      .setDescription('Multi-game player statistics and tracking platform.')
+      .setVersion('0.1.0')
+      .addBearerAuth()
+      .build();
+    const doc = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, doc);
+  }
 
   await ensureBootstrapAdmin(app.get(PrismaService), log);
 
   const port = Number(process.env.BACKEND_PORT ?? 4000);
   await app.listen(port, '0.0.0.0');
   log.log(`GamePulseTracker API listening on http://0.0.0.0:${port}`);
-  log.log(`Swagger docs at /docs`);
+  if (swaggerEnabled) log.log(`Swagger docs at /docs`);
+  else log.log(`Swagger docs disabled in this environment (set SWAGGER_ENABLED=true to expose)`);
 }
 
 /**

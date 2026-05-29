@@ -8,92 +8,14 @@ Keep entries short; link issues / commits when they land.
 ## 🛡 Security audit follow-ups
 
 (From the audit on 2026-05-29. Critical items in this section were fixed
-in-line; the rest are tracked here.)
+in-line. Everything below has been shipped to code; needs end-to-end test
+on a deploy before being moved to Done.)
 
-### Medium
+### Still open
 
-- [ ] **Pairing code uses `Math.random()`** — `devices.service.ts:80-85`.
-      Predictable PRNG over a 32^6 alphabet. Switch to `crypto.randomInt`.
-- [ ] **Refresh token reuse not detected** — `auth.service.ts:45-56`. When
-      a previously-rotated refresh is presented, treat as theft signal and
-      revoke the entire user's session family.
-- [ ] **`AllExceptionsFilter` leaks `exception.message`** for non-HTTP
-      exceptions (Prisma errors, raw constraint names). Return a generic
-      `INTERNAL_ERROR` message, log details server-side only.
-- [ ] **Swagger `/docs` exposed in production** by default. Gate
-      `SwaggerModule.setup` on `NODE_ENV !== 'production'` OR behind admin
-      auth + nginx ACL.
-- [ ] **`ApiKeyGuard` fail-open when feature off** — when
-      `PUBLIC_API_ENABLED !== 'true'` it returns true unconditionally. If
-      the feature is off, return 404; document the intended behaviour.
-- [ ] **Express `trust proxy` not set** — every audit row records the
-      loopback IP behind nginx. Set `app.set('trust proxy', 1)` and parse
-      `X-Forwarded-For`.
-
-### Low
-
-- [ ] **Frontend: socket singleton never disconnected on logout** —
-      subscriptions from a previous user persist across login. Add
-      `disconnectSocket()` to `lib/socket.ts` and call from `logout()`.
-- [ ] **Frontend: no `eslint-plugin-react-hooks`** — useEffect dep-array
-      mistakes don't warn. Enable `next/core-web-vitals` ruleset.
-
-## 🐞 Code-quality audit follow-ups
-
-### High
-
-- [ ] **Connections/Devices error swallowed** — `app/connections/page.tsx`
-      and `app/devices/page.tsx` `.catch(() => {})` hide 401/500 fetch
-      failures. Set an error state and render it like other branches.
-
-### Medium
-
-- [ ] **News refresh is serial** — `news.service.ts:64` for-await across
-      42 integrations. One slow RSS host blocks the whole tick. Use
-      `Promise.allSettled` with a small concurrency limit (`pLimit(6)`).
-- [ ] **News refresh runs for unused integrations** — wasted requests.
-      Only run for games where at least one `TrackedProfile.active=true`
-      exists (or where any LinkedAccount points at the platform).
-- [ ] **Identity-resolve scheduler is serial** —
-      `identity-resolve.scheduler.ts:26` walks 1000 accounts one-by-one.
-      Chunked parallel with bounded concurrency.
-- [ ] **VRChat concurrent 401 → multiple parallel logins** —
-      `vrchat-worlds.integration.ts:128-134` + `vrchat-auth.service.ts:43`.
-      Serialise via an in-flight login Promise singleton.
-- [ ] **CoC tag regex is case-insensitive** — `clash-of-clans.integration.ts:100`.
-      Drop the `i` flag (or uppercase first) so `quy` doesn't route to
-      tag lookup and 404.
-- [ ] **Roblox `Promise.all` tanks on transient 5xx of user lookup** —
-      `roblox.integration.ts:63-71`. Wrap user lookup in `.catch` or use
-      `Promise.allSettled`.
-- [ ] **`games.service.ts:64` swallows all resolveIdentity errors** —
-      including transient ones. Rethrow non-404 IntegrationHttpErrors, or
-      at least log them.
-- [ ] **`news.scheduler.ts` `onModuleInit` setTimeout** not cleared in
-      `onModuleDestroy` — fast restart can fire against a closed Prisma.
-- [ ] **`safeRatio(a, 0)` returns `a`** — `hypixel:109`, `wynncraft:118`,
-      `wargaming.base:125`. Player with kills and zero deaths shows K/D
-      == raw kill count. Return `a` only when both are 0.
-- [ ] **OSRS/RS3 trailing CR** — `osrs.integration.ts:68`,
-      `runescape.integration.ts:61`. `'-1,-1,-1\r'.split(',').map(Number)`
-      → NaN → stored as null silently. `.trim()` each line.
-
-### Low
-
-- [ ] **`devices.service.ts:45` lastSeen update silently swallowed** —
-      `.catch(() => {})`. At least `.catch(e => log.warn(...))`.
 - [ ] **42-arg `IntegrationsModule` constructor** is fragile copy-paste.
-      Use `ModuleRef` + iterate the array.
-- [ ] **`logout()` in `auth.tsx` swallows server failure** — user thinks
-      refresh tokens revoked when they weren't. Surface a warning.
-- [ ] **Frontend `tsconfig.tsbuildinfo` not gitignored or cleaned** —
-      `next build` doesn't drop it. Add to `.gitignore` and to a `prebuild`
-      script.
-
-### Nit
-
-- [ ] **Stray `(TODO)` doc comment** in
-      `warframe.integration.ts:18`.
+      Use `ModuleRef` + iterate the array. (Deferred — purely a refactor,
+      no user-visible effect.)
 
 ---
 
@@ -302,6 +224,65 @@ The request goes into a queue an admin approves or rejects.
 ---
 
 ## ✅ Done (recent)
+
+### Audit follow-ups — shipped 2026-05-29 (needs deploy + smoke-test)
+
+- 🛡 **Pairing code now uses `crypto.randomInt`** instead of `Math.random()`
+  — `devices.service.ts`.
+- 🛡 **Refresh token reuse detection** — a previously-rotated refresh now
+  revokes the entire user's session family as a theft signal
+  (`auth.service.ts`).
+- 🛡 **`AllExceptionsFilter` no longer leaks `exception.message`** for
+  non-HTTP errors. Returns generic "Internal server error" to the client,
+  logs full details server-side.
+- 🛡 **Swagger `/docs` gated** — only mounted when
+  `SWAGGER_ENABLED=true` or `NODE_ENV !== 'production'`.
+- 🛡 **`ApiKeyGuard` no longer fails open** when `PUBLIC_API_ENABLED !=
+  'true'` — returns a 403 with `PUBLIC_API_DISABLED` instead.
+- 🛡 **Express `trust proxy`** set from `TRUST_PROXY` env (defaults to 1
+  hop for nginx). Audit rows now record the real client IP.
+- 🛡 **Frontend socket disconnected on logout** — `disconnectSocket()`
+  added to `lib/socket.ts`, called from `logout()`. No more previous-user
+  subscriptions leaking across login.
+- 🛡 **eslint `next/core-web-vitals` enabled in frontend** with
+  `react-hooks/rules-of-hooks` error + `exhaustive-deps` warn. Added
+  `eslint` + `eslint-config-next` to devDependencies.
+- 🐞 **Connections + Devices error states surfaced** — `app/connections`
+  and `app/devices` no longer `.catch(()=>{})` the fetch.
+- 🐞 **News refresh runs in bounded-parallel** (`CONCURRENCY=6`) and
+  **skips integrations with zero active `TrackedProfile`** — one slow RSS
+  host no longer blocks the whole tick, and we don't burn requests on
+  unused games.
+- 🐞 **Identity-resolve scheduler** now batched parallel (`CONCURRENCY=8`)
+  so the 3am tick can't stall past the next firing.
+- 🐞 **VRChat in-flight login singleton** — `vrchat-auth.service.ts`
+  shares one `Promise<string>` across concurrent 401-driven re-logins so
+  we don't race N parallel `/auth/user` calls and rate-limit ourselves.
+- 🐞 **CoC tag regex case-sensitive** — uppercase first, regex no longer
+  has `i` flag. `quy` (the username) doesn't get routed to tag lookup
+  and 404 anymore.
+- 🐞 **Roblox user lookup wrapped in `.catch`** — a transient 5xx on
+  `/v1/users/{id}` no longer tanks the full profile when
+  friends/followers/thumbnail all succeeded.
+- 🐞 **`games.service.resolveIdentity` errors logged** — non-404 errors
+  surface a `Logger.warn` instead of being swallowed silently.
+- 🐞 **News scheduler `onModuleInit` setTimeout** stored and cleared in
+  `onModuleDestroy`. Tick wrapped in try/catch.
+- 🐞 **`safeRatio(a, 0)` no longer returns `a`** — fixed in `hypixel`,
+  `wynncraft`, `wargaming.base`, `clash-of-clans`. K/D with zero deaths
+  no longer reports raw kill count.
+- 🐞 **OSRS/RS3 hiscores CSV trim** — `.trim()` each line before parsing
+  so the trailing `\r` Jagex sometimes emits doesn't turn every field
+  into NaN.
+- 🐞 **`devices.service` lastSeen update** now logs a warn instead of
+  silently swallowing.
+- 🐞 **`logout()` warns on server failure** — frontend no longer silently
+  pretends refresh tokens were revoked when the network call failed.
+- 🐞 **Frontend `tsconfig.tsbuildinfo` cleanup** — added `prebuild` script
+  that deletes the file before `next build` (already gitignored).
+- 🐞 **Stray `(TODO)` doc comment removed** from `warframe.integration.ts`.
+
+### Prior fixes
 
 - 🛡 **Critical: ingest can't hijack other users' TrackedProfiles** — the
   upsert now refuses cross-user reassignment and rejects with

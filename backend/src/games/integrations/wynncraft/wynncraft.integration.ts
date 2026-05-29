@@ -115,5 +115,8 @@ export class WynncraftIntegration implements GameIntegration {
     };
   }
 
-  private safeRatio(a?: number, b?: number) { if (!a) return 0; if (!b) return a; return Number((a / b).toFixed(3)); }
+  private safeRatio(a?: number, b?: number) {
+    if (!a) return 0;
+    return Number((a / Math.max(1, b ?? 0)).toFixed(3));
+  }
 }

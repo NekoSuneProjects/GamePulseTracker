@@ -22,15 +22,21 @@ export class IdentityResolveScheduler {
       orderBy: [{ lastResolvedAt: { sort: 'asc', nulls: 'first' } }],
     });
 
+    // Bounded-parallel: one slow provider could otherwise stall the whole
+    // 1000-account tick past the next 3am firing.
+    const CONCURRENCY = 8;
     let changed = 0;
-    for (const a of accounts) {
-      try {
-        const result = await this.connections.reResolve(a.userId, a.id, 'auto-resolve');
-        if (result?.changed) changed++;
-      } catch (e) {
-        this.log.warn(`re-resolve ${a.id} (${a.platform}/${a.providerId}) failed: ${(e as Error).message}`);
-      }
+    for (let i = 0; i < accounts.length; i += CONCURRENCY) {
+      const batch = accounts.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(batch.map(async (a) => {
+        try {
+          const result = await this.connections.reResolve(a.userId, a.id, 'auto-resolve');
+          if (result?.changed) changed++;
+        } catch (e) {
+          this.log.warn(`re-resolve ${a.id} (${a.platform}/${a.providerId}) failed: ${(e as Error).message}`);
+        }
+      }));
     }
-    if (changed > 0) this.log.log(`Identity re-resolve: ${changed} account(s) updated`);
+    if (changed > 0) this.log.log(`Identity re-resolve: ${changed}/${accounts.length} account(s) updated`);
   }
 }

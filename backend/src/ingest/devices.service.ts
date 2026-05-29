@@ -1,11 +1,12 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { createHash, randomBytes } from 'crypto';
+import { Injectable, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
+import { createHash, randomBytes, randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 const PREFIX = 'gpt_dev_';
 
 @Injectable()
 export class DevicesService {
+  private readonly log = new Logger(DevicesService.name);
   constructor(private prisma: PrismaService) {}
 
   /** Returns the *plaintext* device key once. Stored as SHA-256 hash. */
@@ -42,7 +43,8 @@ export class DevicesService {
     if (!device || device.revokedAt) {
       throw new UnauthorizedException({ code: 'INVALID_DEVICE_KEY', message: 'Device key invalid or revoked' });
     }
-    await this.prisma.device.update({ where: { id: device.id }, data: { lastSeen: new Date() } }).catch(() => {});
+    await this.prisma.device.update({ where: { id: device.id }, data: { lastSeen: new Date() } })
+      .catch(e => this.log.warn(`lastSeen update failed for device ${device.id}: ${(e as Error).message}`));
     return device;
   }
 
@@ -78,9 +80,11 @@ export class DevicesService {
 
   private hash(s: string) { return createHash('sha256').update(s).digest('hex'); }
   private generateCode() {
-    // Six alphanumeric chars, dash-separated, readable.
+    // Six alphanumeric chars, dash-separated, readable. crypto.randomInt
+    // is uniform + unpredictable; Math.random is neither, which matters here
+    // because brute-forcing a pairing code completes the device-create flow.
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const pick = () => alphabet[Math.floor(Math.random() * alphabet.length)];
+    const pick = () => alphabet[randomInt(alphabet.length)];
     return `${pick()}${pick()}${pick()}-${pick()}${pick()}${pick()}`;
   }
 }

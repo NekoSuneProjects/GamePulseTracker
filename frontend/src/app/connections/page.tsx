@@ -36,7 +36,7 @@ export default function ConnectionsPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push('/login'); return; }
-    refresh().catch(() => {});
+    refresh().catch(e => setError(e instanceof ApiError ? e.message : 'Failed to load connections'));
   }, [loading, user, router]);
 
   async function link(e: React.FormEvent) {
