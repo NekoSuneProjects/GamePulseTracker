@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { NormalizedProfile } from '@gpt/shared';
 import type { GameIntegration, ProfileQuery, ResolvedIdentity, SearchHit } from '../integration.interface';
-import { httpJson } from '../http.helper';
+import { httpJson, withTokenErrorHandling } from '../http.helper';
 
 const COC_API = 'https://api.clashofclans.com/v1';
 
@@ -138,8 +138,11 @@ export class ClashOfClansIntegration implements GameIntegration {
     const platform = q.platform === 'clan' ? 'clan' : 'player';
     const tag = this.normaliseTag(q.identifier);
 
-    if (platform === 'clan') return this.getClan(tag);
-    return this.getPlayer(tag);
+    return withTokenErrorHandling(
+      () => (platform === 'clan' ? this.getClan(tag) : this.getPlayer(tag)),
+      'Clash of Clans (Supercell)',
+      'COC_API_KEY',
+    );
   }
 
   private async getPlayer(tag: string): Promise<NormalizedProfile> {

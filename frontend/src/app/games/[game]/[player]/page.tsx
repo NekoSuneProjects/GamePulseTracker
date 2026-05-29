@@ -10,6 +10,7 @@ import { StatCard, CountUp } from '@/components/StatCard';
 import { LiveChart } from '@/components/LiveChart';
 import { MatchHistory } from '@/components/MatchHistory';
 import { DeletionRequestButton } from '@/components/DeletionRequestButton';
+import { FavoriteButton } from '@/components/FavoriteButton';
 import type { NormalizedProfile, NormalizedMatch } from '@gpt/shared';
 
 interface ProfilePayload {
@@ -76,7 +77,10 @@ export default function PlayerProfilePage({ params }: { params: { game: string; 
 
   return (
     <div className="space-y-8">
-      <PlayerCard profile={snap} live />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0"><PlayerCard profile={snap} live /></div>
+        {data?.profile?.id && <FavoriteButton profileId={data.profile.id} />}
+      </div>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {typeof headline.level === 'number'   && <StatCard accent label="Level"   value={<CountUp value={headline.level} />} />}

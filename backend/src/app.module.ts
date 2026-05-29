@@ -23,6 +23,7 @@ import { IntegrationsModule } from './games/integrations/integrations.module';
 import { NewsModule } from './news/news.module';
 import { IngestModule } from './ingest/ingest.module';
 import { DeletionRequestsModule } from './deletion-requests/deletion-requests.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { DeletionRequestsModule } from './deletion-requests/deletion-requests.mo
     NewsModule,
     IngestModule,
     DeletionRequestsModule,
+    FavoritesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

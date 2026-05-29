@@ -1,4 +1,4 @@
-import type { GameSlug, LeaderboardEntry, NormalizedProfile, NewsItem } from '@gpt/shared';
+import type { GameSlug, LeaderboardEntry, NormalizedProfile, NewsItem, ShopResponse } from '@gpt/shared';
 
 /**
  * Contract every game integration implements.
@@ -66,6 +66,12 @@ export interface GameIntegration {
 
   /** Optional extra: news feed for the game (RSS / blog / patch notes). */
   getNews?(): Promise<NewsItem[]>;
+
+  /**
+   * Optional extra: current in-game shop / rotation. Returns sections (e.g.
+   * Fortnite has "daily" + "featured") so the frontend can group items.
+   */
+  getShop?(): Promise<ShopResponse>;
 }
 
 /** Minimum suggested cache TTL per endpoint, in seconds. */

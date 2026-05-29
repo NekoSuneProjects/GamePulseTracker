@@ -51,3 +51,31 @@ export class IntegrationHttpError extends Error {
     super(`HTTP ${status}`);
   }
 }
+
+/**
+ * Wrap an integration call so that auth-failure responses surface as a
+ * helpful operator-facing message instead of a raw "HTTP 403" or the
+ * provider's HTML error page snippet.
+ *
+ * Use at the call site that hits the auth-gated endpoint, not inside the
+ * httpJson helper itself — only the integration knows which env var it's
+ * configured by.
+ */
+export async function withTokenErrorHandling<T>(
+  fn: () => Promise<T>,
+  providerLabel: string,
+  envVarName: string,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof IntegrationHttpError && (e.status === 401 || e.status === 403)) {
+      throw new Error(
+        `${providerLabel} rejected the API key (HTTP ${e.status}). The token in ${envVarName} ` +
+        `is missing, expired, or IP-restricted to a different host. ` +
+        `Re-issue from the provider's dashboard and update the env var.`,
+      );
+    }
+    throw e;
+  }
+}

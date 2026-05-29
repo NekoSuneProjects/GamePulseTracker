@@ -35,3 +35,14 @@ jobs:
       - name: TypeScript — frontend
         run: npx tsc --noEmit
         working-directory: frontend
+      # next build catches things tsc doesn't — bad imports inside server
+      # components, missing dynamic params, Next config errors, etc. Caught
+      # the lockfile/eslint mismatch a deploy earlier than docker.yml would.
+      - name: Next build — frontend
+        run: npx next build
+        working-directory: frontend
+        env:
+          # Frontend reads these at build time. The values don't matter for
+          # the static analysis pass — production overrides them at runtime.
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_TELEMETRY_DISABLED: '1'

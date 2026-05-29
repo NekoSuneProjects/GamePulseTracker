@@ -37,4 +37,22 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async del(key: string) { return this.client.del(key); }
+
+  /**
+   * Try to acquire a single-holder lock. Returns true if we got it, false
+   * if someone else already holds it. Always pair with `releaseLock(key)`
+   * in a finally block — and pick a TTL long enough to cover the slowest
+   * legitimate operation, so a crashed holder doesn't deadlock the key.
+   *
+   * Implementation is a vanilla `SET … NX EX` — fine for single-Redis
+   * deployments; if we ever go multi-master we'd want Redlock.
+   */
+  async acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+    const res = await this.client.set(key, '1', 'EX', ttlSeconds, 'NX');
+    return res === 'OK';
+  }
+
+  async releaseLock(key: string): Promise<void> {
+    await this.client.del(key);
+  }
 }

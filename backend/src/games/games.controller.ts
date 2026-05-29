@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { GamesService } from './games.service';
 import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -8,11 +8,38 @@ import { Role } from '@prisma/client';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { QueueService } from '../queue/queue.service';
 import { normalisePlatform } from './integrations/integration.interface';
+import { IntegrationRegistry } from './integrations/integration.registry';
+import { RedisService } from '../redis/redis.service';
 
 @ApiTags('games')
 @Controller('games')
 export class GamesController {
-  constructor(private games: GamesService, private queue: QueueService) {}
+  constructor(
+    private games: GamesService,
+    private queue: QueueService,
+    private integrations: IntegrationRegistry,
+    private redis: RedisService,
+  ) {}
+
+  @Public()
+  @Get(':game/shop')
+  async shop(@Param('game') game: string) {
+    if (!this.integrations.has(game)) {
+      throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: `No integration for "${game}"` });
+    }
+    const integ = this.integrations.get(game);
+    if (!integ.getShop) {
+      throw new NotFoundException({ code: 'SHOP_NOT_SUPPORTED', message: `${integ.name} doesn't expose a shop endpoint.` });
+    }
+    // Cache the shop response in Redis for 5 min — most game shops rotate
+    // on a 24h cycle, but the fortnite shop refreshes daily UTC.
+    const cacheKey = `gpt:shop:${game}`;
+    const cached = await this.redis.getJson(cacheKey);
+    if (cached) return { ok: true, data: cached };
+    const data = await integ.getShop();
+    await this.redis.setJson(cacheKey, data, 300);
+    return { ok: true, data };
+  }
 
   @Public()
   @Get()

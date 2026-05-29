@@ -162,16 +162,18 @@ colors, fonts, and stat layouts.
 
 ## 🆕 New game integrations
 
-- [ ] Fortnite **shop endpoint** — `fortnite-api.com/v2/shop` shows what's
-      currently in the item shop. New optional `getShop()` on the
-      integration interface; per-game page section.
-- [ ] Fortnite stats (live) — `/v2/stats/br/v2`, needs `FORTNITE_API_KEY`.
-- [ ] Apex (live via apexlegendsapi).
-- [ ] Halo Infinite — HaloDotAPI or community Waypoint mirror.
-- [ ] R6 Siege — r6stats community.
+- [x] Fortnite **shop endpoint** — `getShop()` added to GameIntegration,
+      live for Fortnite via `fortnite-api.com/v2/shop` (public, no key).
+      Backend route `GET /games/:game/shop` (5-min Redis cache), frontend
+      `ShopGrid` component rendered on the per-game page.
+- [ ] Fortnite stats (live) — `/v2/stats/br/v2`, needs `FORTNITE_API_KEY`
+      (operator action).
+- [ ] Apex (live via apexlegendsapi) — needs operator key.
+- [ ] Halo Infinite — HaloDotAPI key.
+- [ ] R6 Siege — r6stats community (scraping risk).
 - [ ] Valorant — Riot prod key OR henrikdev community proxy.
 - [ ] Overwatch 2 — overfast-api community.
-- [ ] Destiny / Destiny 2 — Bungie OAuth flow.
+- [ ] Destiny / Destiny 2 — Bungie OAuth flow (multi-step).
 
 ## 🧠 Backend hardening
 
@@ -181,10 +183,18 @@ colors, fonts, and stat layouts.
       doesn't exist, linked account owned by another user).
 - [x] Snapshot reads re-derive avatar URL via `normaliseAvatarUrl` on
       every read — covered by the Crafatar centralisation above.
-- [ ] Background queue: dedupe in-flight `refreshProfile(...)` calls.
+- [x] Background queue: dedupe in-flight `refreshProfile(...)` calls —
+      `games.service.getProfile` now holds a Redis lock per
+      `(game, platform, providerId)` for the duration of the integration
+      fetch. Concurrent callers wait up to ~3s for the cache to be
+      populated by the lock holder; fall through to a fetch of their own
+      if the wait times out (covers a holder crash).
 - [ ] Per-integration request log / metrics (Prometheus?) so we can
       see who's rate-limiting us.
-- [ ] Token rotation for Wynncraft / CoC: nicer error when the key expires.
+- [x] Token rotation for Wynncraft / CoC: nicer error when the key
+      expires — new `withTokenErrorHandling()` wrapper translates 401/403
+      from auth-gated providers into an operator-readable message
+      naming the env var to rotate.
 
 ## 🛡 Auth + security
 
@@ -196,8 +206,10 @@ colors, fonts, and stat layouts.
 
 ## 🧑‍🤝‍🧑 Social / community
 
-- [ ] Favorites — bookmark a tracked profile to "Favorites" so it shows
-      up alongside Recent Players in the search drawer.
+- [x] Favorites — `Favorite` Prisma model + `/favorites` CRUD endpoints,
+      star toggle on player profile page, dedicated `/favorites` list
+      page. (The "alongside Recent Players in the search drawer" follow-up
+      depends on the drawer redesign and will land with the UI redesign.)
 - [ ] Public profile feed (level-ups, rank changes) per linked account.
 - [ ] Follow another GamePulseTracker user.
 - [ ] Achievements / badges (verified, 100k matches tracked, etc.).
@@ -212,7 +224,9 @@ colors, fonts, and stat layouts.
 
 ## 🖥 Dev experience
 
-- [ ] CI: also run frontend `next build` (currently we only typecheck).
+- [x] CI: also run frontend `next build` — added to `.github/workflows/
+      ci.yml` after the typecheck steps. Would have caught the lockfile
+      mismatch a deploy earlier than the docker workflow did.
 - [ ] CI: e2e smoke test with Playwright (login → search → profile).
 - [ ] Storybook for components.
 - [ ] Reproducible Postgres seed for demo deployments.

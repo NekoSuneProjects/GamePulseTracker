@@ -42,6 +42,7 @@ model User {
   devices              Device[]
   deletionRequests     StatsDeletionRequest[] @relation("DeletionRequester")
   deletionsResolved    StatsDeletionRequest[] @relation("DeletionResolver")
+  favorites            Favorite[]
 
   @@index([role])
 }
@@ -156,6 +157,7 @@ model TrackedProfile {
   seasons   SeasonRecord[]
   snapshots StatSnapshot[]
   deletionRequests StatsDeletionRequest[]
+  favorites Favorite[]
 
   @@unique([game, platform, providerId])
   @@index([userId])
@@ -287,6 +289,22 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+// ----------------------------------------------------------------------------
+// Favorites — user-bookmarked TrackedProfiles. Show alongside Recent Players.
+// ----------------------------------------------------------------------------
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  profileId String
+  createdAt DateTime @default(now())
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile TrackedProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@index([userId, createdAt])
 }
 
 // ----------------------------------------------------------------------------

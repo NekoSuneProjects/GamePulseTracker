@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { NormalizedProfile } from '@gpt/shared';
 import type { GameIntegration, ProfileQuery, ResolvedIdentity, SearchHit } from '../integration.interface';
-import { httpJson } from '../http.helper';
+import { httpJson, withTokenErrorHandling } from '../http.helper';
 
 const WYNN_API   = 'https://api.wynncraft.com/v3';
 const MOJANG_API = 'https://api.mojang.com';
@@ -69,9 +69,18 @@ export class WynncraftIntegration implements GameIntegration {
     // NOTE: don't pass `fullResult` — Wynncraft v3 changed it to a valueless
     // flag and rejects `fullResult=True` with InvalidQueryParamsError.
     // The basic response still has everything we use below.
-    const data = await httpJson<WynnPlayerResp>(`${WYNN_API}/player/${encodeURIComponent(q.identifier)}`, {
+    //
+    // Token rotation: if a WYNNCRAFT_API_KEY is set and Wynncraft starts
+    // returning 401/403 (revoked or expired), translate to a clearer
+    // operator-facing message. Unauthenticated calls still work, so when no
+    // key is set we leave any 401/403 alone (probably a malformed username).
+    const hasKey = Boolean(process.env.WYNNCRAFT_API_KEY?.trim());
+    const fetchPlayer = () => httpJson<WynnPlayerResp>(`${WYNN_API}/player/${encodeURIComponent(q.identifier)}`, {
       headers: this.headers(),
     });
+    const data = hasKey
+      ? await withTokenErrorHandling(fetchPlayer, 'Wynncraft', 'WYNNCRAFT_API_KEY')
+      : await fetchPlayer();
     const g = data.globalData ?? {};
     const pvpKd = this.safeRatio(g.pvp?.kills, g.pvp?.deaths);
     const totalLevel = g.totalLevel ?? 0;

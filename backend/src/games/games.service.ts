@@ -96,7 +96,39 @@ export class GamesService {
     }
 
     // 5. Otherwise fetch fresh from the integration and upsert.
-    const snap = await integ.getProfile({ identifier: resolvedProviderId, platform: opts.platform });
+    //
+    // In-flight dedup: an HTTP request hitting forceRefresh + a queue
+    // worker firing the same job + another simultaneous client request
+    // were all triggering parallel fetches against the same integration
+    // endpoint. We hold a short Redis lock keyed by the canonical
+    // (game, platform, providerId) for the duration of the fetch, and
+    // any concurrent caller waits briefly for the cache to be populated
+    // by the holder before falling through to its own fetch (the latter
+    // covers a holder crash mid-fetch).
+    const lockKey = `gpt:lock:profile:${canonicalKey.game}:${canonicalKey.platform}:${canonicalKey.providerId}`;
+    const haveLock = await this.redis.acquireLock(lockKey, 30);
+    if (!haveLock) {
+      // Wait up to ~3s for the holder to populate the cache, polling
+      // every 250ms. Keep this tight — if the holder is slow we'd rather
+      // duplicate the fetch than block the HTTP request.
+      for (let i = 0; i < 12; i++) {
+        await new Promise(r => setTimeout(r, 250));
+        const cached = await this.redis.getJson<{ profile: unknown; snapshot: unknown; fresh: boolean }>(cacheKey);
+        if (cached) {
+          this.migrateSnapshotInPlace(cached.snapshot);
+          return cached as { profile: unknown; snapshot: unknown; fresh: false };
+        }
+      }
+      // Fall through and fetch ourselves — better than deadlocking the request.
+    }
+
+    const snap = await (async () => {
+      try {
+        return await integ.getProfile({ identifier: resolvedProviderId, platform: opts.platform });
+      } finally {
+        if (haveLock) await this.redis.releaseLock(lockKey);
+      }
+    })();
     // Some integrations report a more specific platform in the snapshot than
     // the resolver did. Use that as the final, canonical platform for storage.
     const finalPlatform = snap.platform ? normalisePlatform(snap.platform) : canonicalKey.platform;
