@@ -57,6 +57,73 @@ current flat list with a card-grid Account Management page:
 - [ ] Click a card to re-resolve / unlink / re-verify.
 - [ ] Empty cards (no link yet) show a "+ Link" prompt.
 
+## 📺 OBS overlays (Tracker.gg /overlays style)
+
+Streamer-facing live stat overlays per game. Each user creates an overlay
+configuration tied to one of their TrackedProfiles; the overlay renders at
+a unique URL with transparent background that OBS adds as a Browser Source.
+Live stats stream in via Socket.IO so kills/wins/rank update without a
+refresh while the user is in-game.
+
+Reference: https://tracker.gg/overlays — per-game designs with brand
+colors, fonts, and stat layouts.
+
+### Architecture
+- **Prisma model** `OverlayConfig`: `{ id, userId, game, profileId,
+  theme (vertical/horizontal/badge/banner), accent color, opacity, font,
+  visibleFields[], publicSlug (short id used in the OBS URL), createdAt,
+  updatedAt }`. Public slug means the overlay URL doesn't expose the
+  internal id and can be revoked without leaking the database key.
+- **Route** `/overlays` — landing page: per-game gallery showing what each
+  overlay looks like (carousel of screenshots).
+- **Route** `/overlays/new/:game` — designer:
+  - Live preview iframe on the right.
+  - Left panel: pick TrackedProfile, theme variant, accent color (preset
+    palette + custom hex), opacity slider, font, "Show kills / KD / rank /
+    level / win-streak" toggles.
+  - Save → returns the OBS URL + size suggestion.
+- **Route** `/o/:slug` — the overlay itself. Headless component, no nav,
+  no auth. Subscribes to `subscribe:profile { game, platform, providerId }`
+  via Socket.IO, animates stat changes (Framer Motion). transparent
+  background. `?w=480&h=120` query params let OBS pick a width.
+
+### Per-game variants (visual identity per screenshot reference)
+- **Fortnite**: yellow / black, "victory royale" badge, K/D + wins +
+  current placement bar.
+- **Apex Legends**: neon orange / black, current legend portrait + RP +
+  badges.
+- **Valorant**: red / black, rank tier + RR + headshot %.
+- **Rainbow Six**: navy / orange, MMR + K/D + clutch wins.
+- **CoD Warzone**: green / black, kills + placement + revives.
+- **Halo Infinite**: blue, CSR + win rate.
+- **Rocket League**: cyan / pink, MMR + goals + saves.
+- **Overwatch 2**: gold, role + SR.
+- **Hypixel / Wynncraft**: minecraft pixel font, full-body skin to the
+  left of the stat block.
+- **Battlefield**: military stencil, K/D + score-per-min.
+- **OSRS / RS3**: brown leather panel, total level + xp.
+- **WoT/WoWS/WoWp**: tank silhouette, win rate + battles + WN8.
+- **Beat Saber**: neon pink/blue, PP + global rank + last-played map.
+- **Warframe**: orokin gold, mastery rank + plat earned this week.
+- **Roblox**: pixel red, level + matches.
+- **Clash of Clans**: gold/red, town hall level + trophies.
+
+### Frontend internals
+- Reuse the `useLiveProfile` hook so the overlay automatically gets the
+  same realtime updates as the regular profile page.
+- Themes live under `frontend/src/components/overlays/<theme>.tsx`,
+  each exporting a `<Overlay snapshot={...} cfg={...}/>` component.
+- Static screenshot generator (puppeteer at build time?) for the gallery.
+
+### Open questions
+- [ ] Auth model for overlays: anyone with the URL can see (no login)?
+      That matches how Twitch overlays work but means the slug must be
+      unguessable.
+- [ ] Rate-limit: a popular streamer overlay shouldn't get blocked.
+- [ ] Multi-game stack: should a user be able to have ONE overlay that
+      auto-switches based on which game's currently broadcasting via the
+      Overwolf companion?
+
 ## 🗑 Stats deletion requests (user → admin approval)
 
 Users can request deletion of any TrackedProfile that belongs to them.
