@@ -66,8 +66,10 @@ export class WynncraftIntegration implements GameIntegration {
   }
 
   async getProfile(q: ProfileQuery): Promise<NormalizedProfile> {
+    // NOTE: don't pass `fullResult` — Wynncraft v3 changed it to a valueless
+    // flag and rejects `fullResult=True` with InvalidQueryParamsError.
+    // The basic response still has everything we use below.
     const data = await httpJson<WynnPlayerResp>(`${WYNN_API}/player/${encodeURIComponent(q.identifier)}`, {
-      query: { fullResult: 'True' },
       headers: this.headers(),
     });
     const g = data.globalData ?? {};

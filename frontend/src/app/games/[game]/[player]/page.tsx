@@ -55,10 +55,17 @@ export default function PlayerProfilePage({ params }: { params: { game: string; 
 
   const snap = data?.snapshot ?? data?.profile?.latestSnapshot ?? null;
 
-  const levelSeries = useMemo(() => history
-    .filter(h => h.level !== null).map(h => ({ createdAt: h.createdAt, value: Number(h.level) })), [history]);
-  const kdSeries = useMemo(() => history
-    .filter(h => h.kd !== null).map(h => ({ createdAt: h.createdAt, value: Number(h.kd) })), [history]);
+  // Belt-and-suspenders: if history somehow lands as something other than an
+  // array (race condition, stale cache, bad upstream payload), don't crash —
+  // just show no chart for that metric.
+  const levelSeries = useMemo(() => {
+    if (!Array.isArray(history)) return [];
+    return history.filter(h => h.level !== null).map(h => ({ createdAt: h.createdAt, value: Number(h.level) }));
+  }, [history]);
+  const kdSeries = useMemo(() => {
+    if (!Array.isArray(history)) return [];
+    return history.filter(h => h.kd !== null).map(h => ({ createdAt: h.createdAt, value: Number(h.kd) }));
+  }, [history]);
 
   if (isLoading) return <div className="glass p-8 text-center text-ink-300 animate-pulse">Loading profile…</div>;
   if (error)     return <div className="glass p-8 text-center text-red-400">Failed: {String((error as Error).message)}</div>;
@@ -100,7 +107,11 @@ export default function PlayerProfilePage({ params }: { params: { game: string; 
 
       <section>
         <h3 className="text-lg font-display font-semibold mb-3">Match history</h3>
-        <MatchHistory matches={matches.length > 0 ? matches as NormalizedMatch[] : (snap.recent ?? [])} />
+        <MatchHistory matches={
+          Array.isArray(matches) && matches.length > 0
+            ? (matches as NormalizedMatch[])
+            : (Array.isArray(snap.recent) ? snap.recent : [])
+        } />
       </section>
     </div>
   );
