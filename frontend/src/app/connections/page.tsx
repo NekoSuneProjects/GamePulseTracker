@@ -29,8 +29,8 @@ export default function ConnectionsPage() {
   const [busy, setBusy] = useState(false);
 
   async function refresh() {
-    const list = await api<LinkedAccount[]>('/connections', { auth: true });
-    setAccounts(list);
+    const list = await api<LinkedAccount[] | null>('/connections', { auth: true });
+    setAccounts(list ?? []);
   }
 
   useEffect(() => {

@@ -34,11 +34,17 @@ export default function PlayerProfilePage({ params }: { params: { game: string; 
 
   useEffect(() => {
     if (!data?.profile?.providerId) return;
-    const base = `/games/${params.game}/player/${encodeURIComponent(data.profile.providerId)}${qs}`;
-    api<Array<{ createdAt: string; level: number | null; kd: number | null }>>(`${base}/history`)
-      .then(setHistory).catch(() => {});
-    api<NormalizedMatch[]>(`${base}/matches`).then(setMatches).catch(() => {});
-  }, [data?.profile?.providerId, params.game, qs]);
+    // Use the canonical platform the backend persisted (may differ from the
+    // URL's platform — e.g. URL has no ?platform=, backend stored 'minecraft').
+    const platformQs = data.profile.platform && data.profile.platform !== '_'
+      ? `?platform=${encodeURIComponent(data.profile.platform)}`
+      : '';
+    const base = `/games/${params.game}/player/${encodeURIComponent(data.profile.providerId)}${platformQs}`;
+    api<Array<{ createdAt: string; level: number | null; kd: number | null }> | null>(`${base}/history`)
+      .then(d => setHistory(d ?? [])).catch(() => setHistory([]));
+    api<NormalizedMatch[] | null>(`${base}/matches`)
+      .then(d => setMatches(d ?? [])).catch(() => setMatches([]));
+  }, [data?.profile?.providerId, data?.profile?.platform, params.game]);
 
   useLiveProfile(
     params.game,

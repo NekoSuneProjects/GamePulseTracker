@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { GAME_CATALOG, getGame } from '@gpt/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -118,13 +118,31 @@ export class GamesService {
     return result;
   }
 
-  async getProfileHistory(game: string, identifier: string, platform?: string, limit = 200) {
+  /**
+   * Look up a TrackedProfile by (game, providerId), tolerant of the URL
+   * platform mismatching the stored canonical platform. Used by history/
+   * matches/etc. so they don't blindly miss the row.
+   */
+  private async findProfileLoose(game: string, identifier: string, platform?: string) {
     const p = normalisePlatform(platform);
-    const profile = await this.prisma.trackedProfile.findUnique({
+    // Try the URL-supplied platform first.
+    const direct = await this.prisma.trackedProfile.findUnique({
       where: { game_platform_providerId: { game, platform: p, providerId: identifier } },
       select: { id: true },
     });
-    if (!profile) throw new NotFoundException({ code: 'PROFILE_NOT_FOUND', message: 'Profile not tracked yet' });
+    if (direct) return direct;
+    // Otherwise fall back to the first row matching this (game, providerId)
+    // regardless of platform — handles "/games/wynncraft/<uuid>" where the
+    // row was stored under platform='minecraft' rather than '_'.
+    return this.prisma.trackedProfile.findFirst({
+      where: { game, providerId: identifier },
+      select: { id: true },
+    });
+  }
+
+  async getProfileHistory(game: string, identifier: string, platform?: string, limit = 200) {
+    const profile = await this.findProfileLoose(game, identifier, platform);
+    if (!profile) return [];  // empty history is friendlier than 404 for the UI
     return this.prisma.statSnapshot.findMany({
       where: { profileId: profile.id },
       orderBy: { createdAt: 'asc' },
@@ -134,11 +152,7 @@ export class GamesService {
   }
 
   async getMatchHistory(game: string, identifier: string, platform?: string, limit = 25) {
-    const p = normalisePlatform(platform);
-    const profile = await this.prisma.trackedProfile.findUnique({
-      where: { game_platform_providerId: { game, platform: p, providerId: identifier } },
-      select: { id: true },
-    });
+    const profile = await this.findProfileLoose(game, identifier, platform);
     if (!profile) return [];
     return this.prisma.matchRecord.findMany({
       where: { profileId: profile.id },

@@ -67,11 +67,28 @@ export async function api<T>(path: string, init: RequestInit & { auth?: boolean 
   }
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' });
-  const json = (await res.json()) as ApiResponse<T>;
-  if (!json.ok) {
-    throw new ApiError(json.error.code, json.error.message, res.status);
+
+  // The backend's exception filter ALWAYS returns JSON; getting non-JSON here
+  // means something upstream (nginx, a load balancer, a connection reset)
+  // returned an HTML error page or empty body. Surface a useful error instead
+  // of the cryptic "JSON.parse: unexpected character" the browser would throw.
+  const text = await res.text();
+  let parsed: ApiResponse<T> | null = null;
+  if (text) {
+    try { parsed = JSON.parse(text) as ApiResponse<T>; } catch { /* fall through */ }
   }
-  return json.data;
+  if (!parsed) {
+    const snippet = text.slice(0, 200).replace(/\s+/g, ' ').trim();
+    throw new ApiError(
+      'UPSTREAM_NON_JSON',
+      `Server returned a non-JSON ${res.status} response. ${snippet ? `Body: ${snippet}` : '(empty body)'}`,
+      res.status,
+    );
+  }
+  if (!parsed.ok) {
+    throw new ApiError(parsed.error.code, parsed.error.message, res.status);
+  }
+  return parsed.data;
 }
 
 export class ApiError extends Error {

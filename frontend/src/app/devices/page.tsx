@@ -20,8 +20,8 @@ export default function DevicesPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
-    const list = await api<Device[]>('/devices', { auth: true });
-    setDevices(list);
+    const list = await api<Device[] | null>('/devices', { auth: true });
+    setDevices(list ?? []);
   }
 
   useEffect(() => {
