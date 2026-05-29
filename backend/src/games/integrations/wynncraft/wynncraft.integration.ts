@@ -90,7 +90,8 @@ export class WynncraftIntegration implements GameIntegration {
       displayName: data.username,
       platform: 'minecraft',
       // Full-body Minecraft skin render via Crafatar.
-      avatarUrl: `https://crafatar.com/renders/body/${data.uuid}?overlay&size=512`,
+      // mc-heads.net is more reliable than Crafatar (which is returning 521).
+      avatarUrl: `https://mc-heads.net/body/${data.uuid}/right`,
       headline: {
         level: totalLevel,
         rank: data.shortenedRank ?? data.rank ?? undefined,

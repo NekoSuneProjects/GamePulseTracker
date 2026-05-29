@@ -67,15 +67,19 @@ export class GamesService {
     const canonicalKey = { game, platform: resolvedPlatform, providerId: resolvedProviderId };
     const cacheKey = this.redisKey(canonicalKey.game, canonicalKey.platform, canonicalKey.providerId);
 
-    // 3. Cache hit? Use it.
+    // 3. Cache hit? Use it (after migrating any legacy fields like old avatar URLs).
     if (!opts.forceRefresh) {
-      const cached = await this.redis.getJson<unknown>(cacheKey);
-      if (cached) return cached as { profile: unknown; snapshot: unknown; fresh: false };
+      const cached = await this.redis.getJson<{ profile: unknown; snapshot: unknown; fresh: boolean }>(cacheKey);
+      if (cached) {
+        this.migrateSnapshotInPlace(cached.snapshot);
+        return cached as { profile: unknown; snapshot: unknown; fresh: false };
+      }
     }
 
     // 4. Already in DB and not forcing a refresh? Use the row, no fetch.
     if (existing && !opts.forceRefresh && existing.lastFetchedAt) {
-      const result = { profile: existing, snapshot: existing.latestSnapshot, fresh: false };
+      const migrated = this.migrateSnapshotInPlace(existing.latestSnapshot);
+      const result = { profile: existing, snapshot: migrated, fresh: false };
       await this.redis.setJson(cacheKey, result, 300);
       return result;
     }
@@ -168,6 +172,27 @@ export class GamesService {
   // --- helpers ---
   private redisKey(game: string, platform: string, id: string) {
     return `gpt:profile:${game}:${platform}:${id}`;
+  }
+
+  /**
+   * Migrate legacy fields in a cached snapshot on every read. Currently:
+   *   - Rewrites Crafatar URLs to mc-heads.net (Crafatar's been 521ing).
+   * Old DB rows / Redis blobs auto-upgrade without a backfill migration.
+   */
+  private migrateSnapshotInPlace(snap: unknown): unknown {
+    if (!snap || typeof snap !== 'object') return snap;
+    const s = snap as Record<string, unknown>;
+    if (typeof s.avatarUrl === 'string') {
+      s.avatarUrl = this.normaliseAvatarUrl(s.avatarUrl);
+    }
+    return s;
+  }
+  private normaliseAvatarUrl(url: string): string {
+    // crafatar.com/avatars/<uuid>?…       → mc-heads.net/body/<uuid>/right
+    // crafatar.com/renders/body/<uuid>?…  → mc-heads.net/body/<uuid>/right
+    const m = /crafatar\.com\/(?:avatars|renders\/body)\/([0-9a-f-]+)/i.exec(url);
+    if (m) return `https://mc-heads.net/body/${m[1]}/right`;
+    return url;
   }
   private async recordSnapshot(profileId: string, snap: Record<string, unknown>) {
     const headline = (snap.headline ?? {}) as Record<string, number | string | undefined>;

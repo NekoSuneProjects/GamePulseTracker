@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, clearTokens } from '@/lib/api';
 import type { SocialKind, SocialLink } from '@gpt/shared';
 
 const KINDS: SocialKind[] = ['twitter','twitch','youtube','discord','tiktok','kick','instagram','github','website'];
@@ -11,12 +11,27 @@ const KINDS: SocialKind[] = ['twitter','twitch','youtube','discord','tiktok','ki
 export default function SettingsPage() {
   const router = useRouter();
   const { user, loading, refresh } = useAuth();
+
+  // ---- Profile section
   const [avatarUrl, setAvatarUrl] = useState('');
   const [publicProfile, setPublicProfile] = useState(true);
   const [bio, setBio] = useState('');
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // ---- Change username
+  const [newUsername, setNewUsername] = useState('');
+  const [usernamePw, setUsernamePw] = useState('');
+  const [uMsg, setUMsg] = useState<string | null>(null);
+  const [uErr, setUErr] = useState<string | null>(null);
+
+  // ---- Change password
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [pMsg, setPMsg] = useState<string | null>(null);
+  const [pErr, setPErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -25,6 +40,7 @@ export default function SettingsPage() {
     setPublicProfile(user.publicProfile ?? true);
     setBio(user.bio ?? '');
     setSocials(user.socials ?? []);
+    setNewUsername(user.username);
   }, [loading, user, router]);
 
   function addSocial() { setSocials(s => [...s, { kind: 'twitter', value: '' }]); }
@@ -51,12 +67,57 @@ export default function SettingsPage() {
     }
   }
 
+  async function submitUsername(e: React.FormEvent) {
+    e.preventDefault();
+    setUMsg(null); setUErr(null);
+    try {
+      await api('/users/me/username', {
+        method: 'PATCH', auth: true,
+        body: JSON.stringify({ newUsername: newUsername.trim(), password: usernamePw }),
+      });
+      setUsernamePw('');
+      await refresh();
+      setUMsg('Username updated.');
+    } catch (e) {
+      setUErr(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  async function submitPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPMsg(null); setPErr(null);
+    if (newPw !== newPw2) {
+      setPErr('New password and confirmation do not match.');
+      return;
+    }
+    try {
+      await api('/users/me/password', {
+        method: 'PATCH', auth: true,
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      setCurrentPw(''); setNewPw(''); setNewPw2('');
+      setPMsg('Password changed. You’ve been logged out on other devices.');
+      // Server revoked our refresh tokens but kept the current access token
+      // until it expires. Local copy is still valid; nothing to do here.
+    } catch (e) {
+      setPErr(e instanceof ApiError ? e.message : 'Update failed');
+    }
+  }
+
+  function logoutEverywhere() {
+    clearTokens();
+    router.push('/login');
+  }
+
   if (loading || !user) return null;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-8">
       <h1 className="text-3xl font-display font-semibold">Settings</h1>
+
+      {/* ---------- Profile ---------- */}
       <form onSubmit={save} className="glass p-6 space-y-4">
+        <h2 className="font-display font-semibold text-lg">Profile</h2>
         <label className="block">
           <span className="text-sm text-ink-300">Avatar URL</span>
           <input className="input mt-1" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://..." />
@@ -95,6 +156,58 @@ export default function SettingsPage() {
         {msg && <div className="text-pulse-400 text-sm">{msg}</div>}
         {err && <div className="text-red-400 text-sm">{err}</div>}
         <button className="btn-primary">Save changes</button>
+      </form>
+
+      {/* ---------- Change username ---------- */}
+      <form onSubmit={submitUsername} className="glass p-6 space-y-4">
+        <h2 className="font-display font-semibold text-lg">Username</h2>
+        <p className="text-xs text-ink-400">
+          Current: <span className="font-mono">@{user.username}</span>.
+          Changing your username updates all profile URLs immediately.
+        </p>
+        <label className="block">
+          <span className="text-sm text-ink-300">New username</span>
+          <input className="input mt-1" value={newUsername} onChange={e => setNewUsername(e.target.value)}
+            placeholder="newname" minLength={3} maxLength={32} required />
+        </label>
+        <label className="block">
+          <span className="text-sm text-ink-300">Current password</span>
+          <input className="input mt-1" type="password" value={usernamePw} onChange={e => setUsernamePw(e.target.value)}
+            placeholder="••••••••" required autoComplete="current-password" />
+        </label>
+        {uMsg && <div className="text-pulse-400 text-sm">{uMsg}</div>}
+        {uErr && <div className="text-red-400 text-sm">{uErr}</div>}
+        <button className="btn-primary">Change username</button>
+      </form>
+
+      {/* ---------- Change password ---------- */}
+      <form onSubmit={submitPassword} className="glass p-6 space-y-4">
+        <h2 className="font-display font-semibold text-lg">Password</h2>
+        <p className="text-xs text-ink-400">
+          Changing your password signs out all other devices but keeps you logged
+          in here. Hit the button below if you want to sign out everywhere too.
+        </p>
+        <label className="block">
+          <span className="text-sm text-ink-300">Current password</span>
+          <input className="input mt-1" type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)}
+            placeholder="••••••••" required autoComplete="current-password" />
+        </label>
+        <label className="block">
+          <span className="text-sm text-ink-300">New password</span>
+          <input className="input mt-1" type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
+            minLength={8} maxLength={128} placeholder="At least 8 characters" required autoComplete="new-password" />
+        </label>
+        <label className="block">
+          <span className="text-sm text-ink-300">Confirm new password</span>
+          <input className="input mt-1" type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)}
+            minLength={8} maxLength={128} placeholder="Repeat new password" required autoComplete="new-password" />
+        </label>
+        {pMsg && <div className="text-pulse-400 text-sm">{pMsg}</div>}
+        {pErr && <div className="text-red-400 text-sm">{pErr}</div>}
+        <div className="flex gap-2">
+          <button className="btn-primary">Change password</button>
+          <button type="button" onClick={logoutEverywhere} className="btn-ghost text-sm">Sign out here too</button>
+        </div>
       </form>
     </div>
   );

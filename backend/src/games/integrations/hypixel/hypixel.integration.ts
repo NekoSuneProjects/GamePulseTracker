@@ -65,8 +65,9 @@ export class HypixelIntegration implements GameIntegration {
       providerId: p.uuid,
       displayName: p.displayname,
       platform: 'minecraft',
-      // Full-body Minecraft skin render via Crafatar.
-      avatarUrl: `https://crafatar.com/renders/body/${p.uuid}?overlay&size=512`,
+      // Full-body Minecraft skin render. mc-heads.net is more reliable than
+      // Crafatar in 2026 (Crafatar's been returning 521 from Cloudflare).
+      avatarUrl: `https://mc-heads.net/body/${p.uuid}/right`,
       headline: {
         level: Math.floor(networkLevel),
         xp: p.networkExp,
